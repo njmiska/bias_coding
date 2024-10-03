@@ -16,9 +16,9 @@ from scipy import stats
 import re
 
 import sys
-sys.path.append('C:\python')
+sys.path.append(r'C:\python\BS')
 # from functions_optostim import signed_contrast, peri_event_time_histogram, generate_pseudo_sessions, isbiasblockselective_03
-from metadata_opto_allsessions import sessions, find_sessions_by_advanced_criteria
+from metadata_opto_allsessions_B import sessions, find_sessions_by_advanced_criteria
 
 # look at trials+1 for 37 (DLS) to see if bias is still there
 #create criteria for minimum bias to accept session
@@ -128,7 +128,7 @@ eids, trials_ranges, MouseIDs = find_sessions_by_advanced_criteria(
     sessions, 
     # EID = lambda x: x in ['21861d63-c3be-40f4-961b-421cb5fc3913','b1582929-1117-4e44-862e-c775008ca548','c86f4ece-cb61-4f61-a32b-044cc5a7a83f','58f72a9f-471a-4889-a986-49edf7732fc9'],
     # EID = lambda x: x in ['ce616651-aba5-4754-91f3-79d5e929ec70'],
-    # Mouse_ID = 'SWC_NM_075',
+    Mouse_ID = 'SWC_NM_081',
     # Mouse_ID = lambda x: x in ['SWC_NM_072', 'SWC_NM_071', 'SWC_NM_057'],
     # Date = '060324',
     # Hemisphere = 'both',
@@ -136,7 +136,7 @@ eids, trials_ranges, MouseIDs = find_sessions_by_advanced_criteria(
     # Opsin='GtACR2',
     Stimulation_Params ='zapit',
     # Stimulation_Params = 'QPRE',
-    # Pulse_Params = 'motor_bilateral_mask', 
+    Pulse_Params = 'motor_bilateral_mask', 
     # Pulse_Params = 'cont', 
     # Pulse_Params = lambda x: x in ['50hz', '20hz', 'cont_c'],
     # Laser_V = 3,
@@ -187,6 +187,7 @@ only_analyze_trials_x_after_stim = 0 #for removing simply x trials immediately a
 num_stim_locations = 52
 
 condition_data = {i: [] for i in range(0, num_stim_locations+1)}  # 1-52 for laser, 0 for control
+bias_vals_LC = {i: [] for i in range(0, num_stim_locations+1)}
 
 Rblock_wheel_movements_by_condition = [[] for _ in range(53)]
 Lblock_wheel_movements_by_condition = [[] for _ in range(53)]
@@ -1614,6 +1615,36 @@ if is_zapit_session == 0:
 ###############################################################################################
 ####################### ZAPIT ANALYSIS HERE
 else:
+
+    ################for calculating bias values per x trials, subtracting L and R blocks at low contrasts
+    import math
+    trials_per_datapoint = 20
+
+    for condition in range(0, 53):
+        condition_data_Lblock_LC = [trial for trial in condition_data[condition] if trial['contrast'] < 13 and trial['probabilityLeft'] == 0.8]
+        condition_data_Rblock_LC = [trial for trial in condition_data[condition] if trial['contrast'] < 13 and trial['probabilityLeft'] == 0.2]
+        if len(condition_data_Lblock_LC) >= len(condition_data_Rblock_LC):
+            num_cycles = math.floor(len(condition_data_Rblock_LC)/trials_per_datapoint)
+        else:
+            num_cycles = math.floor(len(condition_data_Lblock_LC)/trials_per_datapoint)
+        bias_vals_all = np.empty([num_cycles])
+        bias_vals_all[:] = np.NaN
+        for k in range(0, num_cycles): 
+            condition_data_Lblock_LC_percycle = condition_data_Lblock_LC[k*trials_per_datapoint:(k+1)*trials_per_datapoint]
+            condition_data_Rblock_LC_percycle = condition_data_Rblock_LC[k*trials_per_datapoint:(k+1)*trials_per_datapoint]
+            choice_vals_Lblock = np.empty([trials_per_datapoint])
+            choice_vals_Lblock[:] = np.NaN
+            choice_vals_Rblock = np.empty([trials_per_datapoint])
+            choice_vals_Rblock[:] = np.NaN
+            for l in range(0, trials_per_datapoint):
+                choice_vals_Lblock[l] = condition_data_Lblock_LC_percycle[l]['choice']
+                choice_vals_Rblock[l] = condition_data_Rblock_LC_percycle[l]['choice']
+            mean_choice_Lblock_vals = np.mean(choice_vals_Lblock)
+            mean_choice_Rblock_vals = np.mean(choice_vals_Rblock)
+            bias_val = mean_choice_Lblock_vals - mean_choice_Rblock_vals
+            bias_vals_all[k] = bias_val
+
+        bias_vals_LC[condition] = bias_vals_all
             
     ##### calculate bias values at each contrast using all trials
     contrasts = [-100.0, -25.0, -12.5, -6.25, 0.0, 6.25, 12.5, 25.0, 100.0]
@@ -1703,6 +1734,46 @@ else:
         effect_sizes[condition] = -(stim_bias_sum - nonstim_bias_sum)/nonstim_bias_sum
 
 
+    comparison_results_LC = {}
+    for condition in range(1, 53):
+        if bias_vals_LC[0] and bias_vals_LC[condition]:  # Check if both conditions have data
+            x, p_val_ttestind = stats.ttest_ind(bias_vals_LC[0], bias_vals_LC[condition])
+            comparison_results_LC[condition] = p_val_ttestrel
+    # comparison_results contains the p-values from the Mann-Whitney U test for each condition compared to nonstim
+    [kw_statistic,kwpval] = stats.kruskal(bias_vals_LC[0],bias_vals_LC[1],bias_vals_LC[2],bias_vals_LC[3],bias_vals_LC[4],
+                    bias_vals_LC[5],bias_vals_LC[6],bias_vals_LC[7],bias_vals_LC[8],bias_vals_LC[9],
+                    bias_vals_LC[10],bias_vals_LC[11],bias_vals_LC[12],bias_vals_LC[13],bias_vals_LC[14],
+                    bias_vals_LC[15],bias_vals_LC[16],bias_vals_LC[17],bias_vals_LC[18],bias_vals_LC[19],
+                    bias_vals_LC[20],bias_vals_LC[21],bias_vals_LC[22],bias_vals_LC[23],bias_vals_LC[24],
+                    bias_vals_LC[25],bias_vals_LC[26],bias_vals_LC[27],bias_vals_LC[28],bias_vals_LC[29],
+                    bias_vals_LC[30],bias_vals_LC[31],bias_vals_LC[32],bias_vals_LC[33],bias_vals_LC[34],
+                    bias_vals_LC[35],bias_vals_LC[36],bias_vals_LC[37],bias_vals_LC[38],bias_vals_LC[39],
+                    bias_vals_LC[40],bias_vals_LC[41],bias_vals_LC[42],bias_vals_LC[43],bias_vals_LC[44],
+                    bias_vals_LC[45],bias_vals_LC[46],bias_vals_LC[47],bias_vals_LC[48],bias_vals_LC[49],
+                    bias_vals_LC[50],bias_vals_LC[51],bias_vals_LC[52])
+    [ANOVA_statistic,ANOVApval] = stats.f_oneway(bias_vals_LC[0],bias_vals_LC[1],bias_vals_LC[2],bias_vals_LC[3],bias_vals_LC[4],
+                    bias_vals_LC[5],bias_vals_LC[6],bias_vals_LC[7],bias_vals_LC[8],bias_vals_LC[9],
+                    bias_vals_LC[10],bias_vals_LC[11],bias_vals_LC[12],bias_vals_LC[13],bias_vals_LC[14],
+                    bias_vals_LC[15],bias_vals_LC[16],bias_vals_LC[17],bias_vals_LC[18],bias_vals_LC[19],
+                    bias_vals_LC[20],bias_vals_LC[21],bias_vals_LC[22],bias_vals_LC[23],bias_vals_LC[24],
+                    bias_vals_LC[25],bias_vals_LC[26],bias_vals_LC[27],bias_vals_LC[28],bias_vals_LC[29],
+                    bias_vals_LC[30],bias_vals_LC[31],bias_vals_LC[32],bias_vals_LC[33],bias_vals_LC[34],
+                    bias_vals_LC[35],bias_vals_LC[36],bias_vals_LC[37],bias_vals_LC[38],bias_vals_LC[39],
+                    bias_vals_LC[40],bias_vals_LC[41],bias_vals_LC[42],bias_vals_LC[43],bias_vals_LC[44],
+                    bias_vals_LC[45],bias_vals_LC[46],bias_vals_LC[47],bias_vals_LC[48],bias_vals_LC[49],
+                    bias_vals_LC[50],bias_vals_LC[51],bias_vals_LC[52])
+    
+        # Calculate effect sizes for each condition
+    effect_sizes_LC = {}
+    nonstim_bias_mean = np.mean(bias_vals_LC[0])
+    for condition in range(1, 53):
+        if not bias_vals_LC[condition]:  # Skip empty conditions
+            continue
+
+        stim_bias_mean = np.mean(bias_vals_LC[condition])
+        effect_sizes[condition] = -(stim_bias_mean - nonstim_bias_mean)/nonstim_bias_mean
+
+
     # for j in stimulus_locations:
     #     reaction_times_temp = stim_trials.reaction_times[np.where(stim_trials.stim_location == j)]
     #     pval_rt[j] = stats.ttest_rel(reaction_times_temp,rt_nonstimtrials_all)
@@ -1722,7 +1793,7 @@ else:
     stim_locations = {}
 
     # Assume we read the file line by line
-    with open('/Users/natemiska/Documents/python/BS/zapit_log_2024_02_28__12-41.yml', 'r') as file:
+    with open(r'C:\python\zapit_log_2024_02_28__12-41.yml', 'r') as file:
         lines = file.readlines()
 
     # Variables to keep track of the current location being processed
@@ -1873,8 +1944,8 @@ else:
     import matplotlib.colors as mcolors
 
     # Load your brain atlas image
-    allenCCF_data = np.load('/Users/natemiska/Documents/python/allen/annotation_volume_10um.npy')
-    structure_tree = pd.read_csv('/Users/natemiska/Documents/python/allen/structure_tree_safe_2017.csv')
+    allenCCF_data = np.load(r'C:\python\annotation_volume_10um.npy')
+    structure_tree = pd.read_csv(r'C:\python\structure_tree_safe_2017.csv')
 
     def generate_mip_with_borders(annotation_volume):
         # Assuming the AP axis is the first axis (shape is AP x DV x ML)
@@ -2078,7 +2149,7 @@ else:
     cbar.ax.tick_params(labelsize=12)
     plt.show()
 
-    ############ BIAS
+    ############ BIAS1
     # Assuming stim_locations is a dictionary with coordinates for each stimulation point
 
     # Plot the brain atlas with the correct extent

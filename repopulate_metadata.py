@@ -4,7 +4,7 @@ from one.api import ONE
 one = ONE(base_url='https://alyx.internationalbrainlab.org')
 
 # Define a list of Mouse IDs to repopulate sessions for
-mouse_ids = ['SWC_NM_081']  # Replace with actual mouse IDs
+mouse_ids = ['SWC_NM_082']  # Replace with actual mouse IDs
 start_date = '2024-06-26'  # Replace with your desired date to filter
 end_date = '2024-10-02'  # Replace with your desired date to filter
 
@@ -27,7 +27,7 @@ for mouse_id in mouse_ids:
             'P_Opto': 0.5,
             'Stimulation_Params': 'zapit',
             'Pulse_Params': 'motor_bilateral_mask',
-            'Laser_V': 0,
+            'Laser_V': 2,
             'Opsin': 'VGAT-ChR2',
             'Brain_Region': 'motor_bilateral',
             'Genetic_Line': 'VGAT-Cre',
@@ -36,4 +36,10 @@ for mouse_id in mouse_ids:
         # Add more metadata if needed (like optogenetic manipulations)
         sessions.append(session_info)
 
-# Now 'sessions' contains the repopulated data
+print(sessions, sep='\n')
+
+# # Now 'sessions' contains the repopulated data
+
+# for j in range(0,len(sessions)):
+#     print(sessions[j])
+#     input("Press Enter to continue...")
