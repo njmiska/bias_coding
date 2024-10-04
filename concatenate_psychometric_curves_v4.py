@@ -99,7 +99,7 @@ def calculate_choice_probability(condition_data, block_type, contrast_level):
 
 ############### OPTIONS ####################
 
-is_zapit_session = 1
+is_zapit_session = 0
 
 BL_perf_thresh = 0.70 #0.79 
 stim_perf_thresh = 0 #0.5
@@ -115,6 +115,8 @@ save_figures = 0
 figure_save_path = '/Users/natemiska/Desktop/other_figures/CP/'
 figure_prefix = 'D2_ex_DLS'
 
+title_text = '81, 82, 57'
+
 ############## WHEEL OPTIONS ##############
 
 length_of_time_to_analyze_wheel_movement = 10
@@ -128,18 +130,18 @@ eids, trials_ranges, MouseIDs = find_sessions_by_advanced_criteria(
     sessions, 
     # EID = lambda x: x in ['21861d63-c3be-40f4-961b-421cb5fc3913','b1582929-1117-4e44-862e-c775008ca548','c86f4ece-cb61-4f61-a32b-044cc5a7a83f','58f72a9f-471a-4889-a986-49edf7732fc9'],
     # EID = lambda x: x in ['ce616651-aba5-4754-91f3-79d5e929ec70'],
-    Mouse_ID = 'SWC_NM_081',
-    # Mouse_ID = lambda x: x in ['SWC_NM_072', 'SWC_NM_071', 'SWC_NM_057'],
+    Mouse_ID = 'SWC_NM_080',
+    # Mouse_ID = lambda x: x in ['SWC_NM_082', 'SWC_NM_081', 'SWC_NM_057'],
     # Date = '060324',
     # Hemisphere = 'both',
     # Opsin=lambda x: x in ['GtACR2', 'ChR2'],
     # Opsin='GtACR2',
-    Stimulation_Params ='zapit',
-    # Stimulation_Params = 'QPRE',
-    Pulse_Params = 'motor_bilateral_mask', 
-    # Pulse_Params = 'cont', 
+    # Stimulation_Params ='zapit',
+    Stimulation_Params = 'QPRE',
+    # Pulse_Params = 'motor_bilateral_mask', 
+    Pulse_Params = 'cont', 
     # Pulse_Params = lambda x: x in ['50hz', '20hz', 'cont_c'],
-    # Laser_V = 3,
+    # Laser_V = 2,
     # Laser_V = lambda x: x in [0.3,0.4,0.5]
     # Genetic_Line = 'D2-Cre',
     # Brain_Region = 'motor_bilateral',
@@ -1618,7 +1620,7 @@ else:
 
     ################for calculating bias values per x trials, subtracting L and R blocks at low contrasts
     import math
-    trials_per_datapoint = 20
+    trials_per_datapoint = 10
 
     for condition in range(0, 53):
         condition_data_Lblock_LC = [trial for trial in condition_data[condition] if trial['contrast'] < 13 and trial['probabilityLeft'] == 0.8]
@@ -1736,9 +1738,9 @@ else:
 
     comparison_results_LC = {}
     for condition in range(1, 53):
-        if bias_vals_LC[0] and bias_vals_LC[condition]:  # Check if both conditions have data
+        if len(bias_vals_LC[condition]) > 0:  # Check if both conditions have data
             x, p_val_ttestind = stats.ttest_ind(bias_vals_LC[0], bias_vals_LC[condition])
-            comparison_results_LC[condition] = p_val_ttestrel
+            comparison_results_LC[condition] = p_val_ttestind
     # comparison_results contains the p-values from the Mann-Whitney U test for each condition compared to nonstim
     [kw_statistic,kwpval] = stats.kruskal(bias_vals_LC[0],bias_vals_LC[1],bias_vals_LC[2],bias_vals_LC[3],bias_vals_LC[4],
                     bias_vals_LC[5],bias_vals_LC[6],bias_vals_LC[7],bias_vals_LC[8],bias_vals_LC[9],
@@ -1762,16 +1764,16 @@ else:
                     bias_vals_LC[40],bias_vals_LC[41],bias_vals_LC[42],bias_vals_LC[43],bias_vals_LC[44],
                     bias_vals_LC[45],bias_vals_LC[46],bias_vals_LC[47],bias_vals_LC[48],bias_vals_LC[49],
                     bias_vals_LC[50],bias_vals_LC[51],bias_vals_LC[52])
-    
+
         # Calculate effect sizes for each condition
     effect_sizes_LC = {}
     nonstim_bias_mean = np.mean(bias_vals_LC[0])
     for condition in range(1, 53):
-        if not bias_vals_LC[condition]:  # Skip empty conditions
+        if len(bias_vals_LC[condition]) == 0:  # Skip empty conditions
             continue
 
         stim_bias_mean = np.mean(bias_vals_LC[condition])
-        effect_sizes[condition] = -(stim_bias_mean - nonstim_bias_mean)/nonstim_bias_mean
+        effect_sizes_LC[condition] = -(stim_bias_mean - nonstim_bias_mean)/nonstim_bias_mean
 
 
     # for j in stimulus_locations:
@@ -2017,7 +2019,7 @@ else:
     ax.set_ylim(bottom=-2, top=4)
     ax.set_xlabel('Mediolateral Position (mm from Bregma)', fontsize=14)
     ax.set_ylabel('Anteroposterior Position (mm from Bregma)', fontsize=14)
-    # ax.set_title('Bilateral Inhibition Effect on Reaction Time', fontsize=18)
+    ax.set_title(title_text, fontsize=18)
 
     # Example p-values for the legend
     p_values = [0.001, 0.01, 0.05, 0.2]
@@ -2225,6 +2227,75 @@ else:
     # 'aspect' controls the ratio of the colorbar's length to its width.
     cbar = plt.colorbar(sm, ax=ax, orientation='vertical', fraction=0.046, pad=0.04, aspect=12)
     cbar.set_label('Block Bias Reduction', fontsize=14, labelpad=15)
+    cbar.ax.tick_params(labelsize=12)
+    plt.show()
+
+    ############ BIAS2
+
+    # Plot the brain atlas with the correct extent
+    fig, ax = plt.subplots(figsize=(10, 8))
+    ax.imshow(dorsal_mip_with_borders, cmap='gray', extent=[left_extent, right_extent, lower_extent, upper_extent])
+
+    # Normalize effect sizes for color mapping
+    norm = mcolors.Normalize(vmin=min(effect_sizes_LC.values()), vmax=max(effect_sizes_LC.values()))
+
+    # Create a ScalarMappable and initialize a colormap
+    sm = plt.cm.ScalarMappable(cmap="coolwarm", norm=norm)
+    # sm.set_array([])  # Only needed for older versions of matplotlib
+
+    # Plot the stimulation points with effect sizes and p-values
+    for condition, effect_size in effect_sizes_LC.items():
+        coords = stim_locations[condition]
+        # p_val = comparison_results.get(condition, 1)  # Default to 1 if not found
+        p_val = comparison_results_LC.get(condition, 1)
+        print('the p value for condition ' + str(condition) + ' = ' + str(p_val))
+
+        # Determine the transparency based on the p-value
+        if p_val < 0.05:
+            alpha = 1
+        else:
+            alpha = 0.5
+
+        # Determine color based on effect size
+        color = sm.to_rgba(effect_size)
+
+        # size = 200 - 200*p_val
+        if np.isnan(p_val) == 1:
+            size = 0
+        else:
+            size = -100*np.log10(p_val)#**2
+
+        plt.scatter(coords['ML_left'], coords['AP'], color=color, alpha=alpha, edgecolors='w', s=size)
+        plt.scatter(coords['ML_right'], coords['AP'], color=color, alpha=alpha, edgecolors='w', s=size)
+
+        # Annotate the points with the condition number
+        # plt.text(coords['ML_left'], coords['AP'], str(condition), color='yellow', ha='center', va='center')
+        # plt.text(coords['ML_right'], coords['AP'], str(condition), color='yellow', ha='center', va='center')
+
+    # Add labels, title, etc.
+    ax.set_ylim(bottom=-2, top=4)
+    ax.set_xlabel('Mediolateral Position (mm from Bregma)', fontsize=14)
+    ax.set_ylabel('Anteroposterior Position (mm from Bregma)', fontsize=14)
+
+    # Example p-values for the legend
+    p_values = [0.001, 0.01, 0.05, 0.2]
+    sizes = [-100 * np.log10(p) for p in p_values]
+    # Creating the scatter plot
+    # Adding a scatter plot point for each example p-value
+    for p, size in zip(p_values, sizes):
+        ax.scatter([], [], s=size, label=f'p = {p}', edgecolors='w', color='k')
+    # Adding the legend with title
+    ax.legend(loc='upper left', labelspacing=1.5)
+
+    # Increase the size of the tick labels
+    ax.tick_params(axis='both', which='major', labelsize=14)  # 'both' applies changes to both x and y axis
+
+    # Add a colorbar with adjusted size
+    # 'fraction' is the width of the colorbar as a fraction of the axes
+    # 'pad' is the spacing between the colorbar and the figure
+    # 'aspect' controls the ratio of the colorbar's length to its width.
+    cbar = plt.colorbar(sm, ax=ax, orientation='vertical', fraction=0.046, pad=0.04, aspect=12)
+    cbar.set_label('Block Bias Reduction (alt)', fontsize=14, labelpad=15)
     cbar.ax.tick_params(labelsize=12)
     plt.show()
 
