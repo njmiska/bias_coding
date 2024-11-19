@@ -7,6 +7,7 @@ import pandas as pd
 import seaborn as sns
 from ibllib.io.raw_data_loaders import load_data
 from one.api import ONE
+from matplotlib import colors
 
 import psychofit as psy ### install w/ pip install Psychofit 
 
@@ -16,7 +17,8 @@ from scipy import stats
 import re
 
 import sys
-sys.path.append(r'C:\python\BS')
+sys.path.append('/Users/natemiska/python/bias_coding')
+sys.path.append('/Users/natemiska/python/bias_coding/Allen')
 # from functions_optostim import signed_contrast, peri_event_time_histogram, generate_pseudo_sessions, isbiasblockselective_03
 from metadata_opto_allsessions_B import sessions, find_sessions_by_advanced_criteria
 
@@ -99,14 +101,19 @@ def calculate_choice_probability(condition_data, block_type, contrast_level):
 
 ############### OPTIONS ####################
 
-is_zapit_session = 0
+is_zapit_session = 1
 
 BL_perf_thresh = 0.70 #0.79 
 stim_perf_thresh = 0 #0.5
 min_num_trials = 300 #300
 min_bias_threshold = 0.5 #0.75
-min_bias_threshold_zapit = 1 #1.5
+min_bias_threshold_zapit = 1.25 #1.5
 RT_threshold = 30 #20
+
+trials_per_datapoint = 5 ### specifically for num choices to avg for bias assessment
+
+only_include_low_contrasts = 1
+low_contrast_threshold = 13
 
 use_trials_after_stim = 0
 subsample_trials_after_stim = 0
@@ -115,36 +122,37 @@ save_figures = 0
 figure_save_path = '/Users/natemiska/Desktop/other_figures/CP/'
 figure_prefix = 'D2_ex_DLS'
 
-title_text = '81, 82, 57'
+title_text = '85'
 
 ############## WHEEL OPTIONS ##############
 
 length_of_time_to_analyze_wheel_movement = 10
 interval = 0.1
 stim_rt_threshold = 100
-align_to = 'QP'#'feedback'#'goCue_pre'#'QP'
-only_include_low_contrasts = 0
-low_contrast_threshold = 13
+align_to = 'goCue_pre'#'feedback'#'goCue_pre'#'QP'
+
 
 eids, trials_ranges, MouseIDs = find_sessions_by_advanced_criteria(
     sessions, 
     # EID = lambda x: x in ['21861d63-c3be-40f4-961b-421cb5fc3913','b1582929-1117-4e44-862e-c775008ca548','c86f4ece-cb61-4f61-a32b-044cc5a7a83f','58f72a9f-471a-4889-a986-49edf7732fc9'],
     # EID = lambda x: x in ['ce616651-aba5-4754-91f3-79d5e929ec70'],
-    Mouse_ID = 'SWC_NM_080',
-    # Mouse_ID = lambda x: x in ['SWC_NM_082', 'SWC_NM_081', 'SWC_NM_057'],
+    Mouse_ID = 'SWC_NM_086',
+    # Mouse_ID = lambda x: x in ['SWC_NM_082', 'SWC_NM_081', 'SWC_NM_057', 'SWC_NM_085', 'SWC_NM_086'],
     # Date = '060324',
-    # Hemisphere = 'both',
+    # Hemisphere = 'left',
     # Opsin=lambda x: x in ['GtACR2', 'ChR2'],
     # Opsin='GtACR2',
     # Stimulation_Params ='zapit',
-    Stimulation_Params = 'QPRE',
-    # Pulse_Params = 'motor_bilateral_mask', 
-    Pulse_Params = 'cont', 
+    # Stimulation_Params = 'QPRE',
+    # Stimulation_Params = lambda x: x in ['QPRE', 'QPRE*'],
+    # Pulse_Params = 'aMOs-4point', 
+    Pulse_Params = 'motor_bilateral_mask', 
     # Pulse_Params = lambda x: x in ['50hz', '20hz', 'cont_c'],
-    # Laser_V = 2,
+    Laser_V = 2,
     # Laser_V = lambda x: x in [0.3,0.4,0.5]
     # Genetic_Line = 'D2-Cre',
     # Brain_Region = 'motor_bilateral',
+    # Brain_Region = 'VLS',
 )
 
 # # Example usage:
@@ -649,7 +657,7 @@ for j in range(0,np.size(eids)):
                 trialnum = k
 
                 if only_include_low_contrasts == 1:
-                    if ~low_contrast_trials_bool_all[k]:
+                    if abs(signed_contrast(trials)[trial_number]) > low_contrast_threshold:
                         continue
                 # print(str(trialnum))
 
@@ -848,7 +856,7 @@ for j in range(0,np.size(eids)):
         #     continue
 
         ############################## zapit stim locations log
-        file_path = r'C:\Users\IBLuser\zapit_trials.yml'
+        file_path = '/Users/natemiska/python/bias_coding/zapit_trials.yml'
 
         details = one.get_details(eid)
         exp_start_time_str = details['start_time']
@@ -1034,6 +1042,10 @@ for j in range(0,np.size(eids)):
             if reaction_time > RT_threshold:
                 if np.isnan(RT_threshold) == 0:
                     continue
+            if only_include_low_contrasts == 1:
+                if abs(signed_contrast(trials)[trial_number]) > low_contrast_threshold:
+                    continue
+
 
             trials_data = {
                 # 'intervals': trials.intervals[trial_number],
@@ -1061,7 +1073,7 @@ for j in range(0,np.size(eids)):
             ##### Load wheel data
 
             if only_include_low_contrasts == 1:
-                if ~low_contrast_trials_bool_all[k]:
+                if abs(signed_contrast(trials)[trial_number]) > low_contrast_threshold:
                     continue
             # start_time = taskData[trial_number]['behavior_data']['States timestamps']['trial_start'][0][0] - 0.03 #quiescent period - first 30ms step
             # start_time = taskData[trial_number]['behavior_data']['States timestamps']['reward'][0][0] - 0.5 #reward/error
@@ -1620,7 +1632,6 @@ else:
 
     ################for calculating bias values per x trials, subtracting L and R blocks at low contrasts
     import math
-    trials_per_datapoint = 10
 
     for condition in range(0, 53):
         condition_data_Lblock_LC = [trial for trial in condition_data[condition] if trial['contrast'] < 13 and trial['probabilityLeft'] == 0.8]
@@ -1649,7 +1660,10 @@ else:
         bias_vals_LC[condition] = bias_vals_all
             
     ##### calculate bias values at each contrast using all trials
-    contrasts = [-100.0, -25.0, -12.5, -6.25, 0.0, 6.25, 12.5, 25.0, 100.0]
+    if only_include_low_contrasts == 0:
+        contrasts = [-100.0, -25.0, -12.5, -6.25, 0.0, 6.25, 12.5, 25.0, 100.0]
+    else:
+        contrasts = [-12.5, -6.25, 0.0, 6.25, 12.5] ### need to make this depend on contrast threshold!
 
     # Initialize a dictionary to hold the bias values for each condition
     bias_values = {cond: [] for cond in range(53)}  # 0 for nonstim, 1-52 for stim
@@ -1681,7 +1695,7 @@ else:
                 left_block_pleft_vals[condition].append(nonstim_left_prob)
                 right_block_pleft_vals[condition].append(nonstim_right_prob)
                 bias_values[condition].append(stim_bias)
-                
+
 
     # Now perform a statistical test to compare the block bias between nonstim and each stim condition
     comparison_results = {}
@@ -1727,13 +1741,20 @@ else:
         # nonstim_0_bias = bias_values[0][4]
         # stim_0_bias = bias_values[condition][4]
         # effect_sizes[condition] = nonstim_0_bias - stim_0_bias
-        nonstim_bias_sum = np.sum([bias_values[0][0],bias_values[0][1],bias_values[0][2],bias_values[0][3],
-                                bias_values[0][4],bias_values[0][5],bias_values[0][6],bias_values[0][7],
-                                bias_values[0][8]])
-        stim_bias_sum = np.sum([bias_values[condition][0],bias_values[condition][1],bias_values[condition][2],bias_values[condition][3],
-                                bias_values[condition][4],bias_values[condition][5],bias_values[condition][6],bias_values[condition][7],
-                                bias_values[condition][8]])
-        effect_sizes[condition] = -(stim_bias_sum - nonstim_bias_sum)/nonstim_bias_sum
+        if only_include_low_contrasts == 0:
+            nonstim_bias_sum = np.sum([bias_values[0][0],bias_values[0][1],bias_values[0][2],bias_values[0][3],
+                                    bias_values[0][4],bias_values[0][5],bias_values[0][6],bias_values[0][7],
+                                    bias_values[0][8]])
+            stim_bias_sum = np.sum([bias_values[condition][0],bias_values[condition][1],bias_values[condition][2],bias_values[condition][3],
+                                    bias_values[condition][4],bias_values[condition][5],bias_values[condition][6],bias_values[condition][7],
+                                    bias_values[condition][8]])
+            effect_sizes[condition] = -(stim_bias_sum - nonstim_bias_sum)/nonstim_bias_sum
+        else:
+            nonstim_bias_sum = np.sum([bias_values[0][0],bias_values[0][1],bias_values[0][2],bias_values[0][3],
+                                    bias_values[0][4]])
+            stim_bias_sum = np.sum([bias_values[condition][0],bias_values[condition][1],bias_values[condition][2],bias_values[condition][3],
+                                    bias_values[condition][4]])
+            effect_sizes[condition] = -(stim_bias_sum - nonstim_bias_sum)/nonstim_bias_sum
 
 
     comparison_results_LC = {}
@@ -1795,7 +1816,7 @@ else:
     stim_locations = {}
 
     # Assume we read the file line by line
-    with open(r'C:\python\zapit_log_2024_02_28__12-41.yml', 'r') as file:
+    with open('/Users/natemiska/python/bias_coding/zapit_log_2024_02_28__12-41.yml', 'r') as file:
         lines = file.readlines()
 
     # Variables to keep track of the current location being processed
@@ -1946,8 +1967,8 @@ else:
     import matplotlib.colors as mcolors
 
     # Load your brain atlas image
-    allenCCF_data = np.load(r'C:\python\annotation_volume_10um.npy')
-    structure_tree = pd.read_csv(r'C:\python\structure_tree_safe_2017.csv')
+    allenCCF_data = np.load('/Users/natemiska/python/Allen/annotation_volume_10um.npy')
+    structure_tree = pd.read_csv('/Users/natemiska/python/Allen/structure_tree_safe_2017.csv')
 
     def generate_mip_with_borders(annotation_volume):
         # Assuming the AP axis is the first axis (shape is AP x DV x ML)
@@ -1994,10 +2015,12 @@ else:
 
     # Normalize effect sizes for color mapping: you may need to adjust the scale based on your data
     # norm = mcolors.Normalize(vmin=-0.3, vmax=0.3)
-    norm = mcolors.Normalize(vmin = RT_analysis_results[0]['mean'] - 0.3*RT_analysis_results[0]['mean'], vmax = RT_analysis_results[0]['mean'] + 0.3*RT_analysis_results[0]['mean'])
+    ### issue with below is that we need a colormap that is skewed to one side
+    # norm = mcolors.Normalize(vmin = RT_analysis_results[0]['mean'] - 0.6*RT_analysis_results[0]['mean'], vmax = RT_analysis_results[0]['mean'] + 0.6*RT_analysis_results[0]['mean'])
+    divnorm=colors.TwoSlopeNorm(vmin = RT_analysis_results[0]['mean'] - 0.4*RT_analysis_results[0]['mean'], vcenter=RT_analysis_results[0]['mean'], vmax = RT_analysis_results[0]['mean'] + RT_analysis_results[0]['mean'])
 
     # Create a ScalarMappable and initialize a colormap
-    sm = plt.cm.ScalarMappable(cmap="coolwarm", norm=norm)
+    sm = plt.cm.ScalarMappable(cmap="coolwarm", norm=divnorm)
 
     # Overlay the stimulation points directly since they are already in the correct scale and framework
     for condition, coords in stim_locations.items():
@@ -2099,57 +2122,59 @@ else:
     cbar.ax.tick_params(labelsize=12)
     plt.show()
 
-    ############ LAPSE RATE
-    # Plot the brain atlas with the correct extent
-    fig, ax = plt.subplots(figsize=(10, 8))
-    ax.imshow(dorsal_mip_with_borders, cmap='gray', extent=[left_extent, right_extent, lower_extent, upper_extent])
+    if only_include_low_contrasts == 0:
+        ############ LAPSE RATE
+        # Plot the brain atlas with the correct extent
+        fig, ax = plt.subplots(figsize=(10, 8))
+        ax.imshow(dorsal_mip_with_borders, cmap='gray', extent=[left_extent, right_extent, lower_extent, upper_extent])
 
-    # Normalize effect sizes for color mapping: you may need to adjust the scale based on your data
-    # norm = mcolors.Normalize(vmin=lapse_rate_nonstim, vmax=lapse_rate_nonstim + 0.15)
-    norm = mcolors.Normalize(vmin=lapse_rate_nonstim, vmax=lapse_rate_nonstim + 0.15)
-    # norm = mcolors.Normalize(vmin=lapse_rate_nonstim, vmax=max(lapse_rate_results))
+        # Normalize effect sizes for color mapping: you may need to adjust the scale based on your data
+        # norm = mcolors.Normalize(vmin=lapse_rate_nonstim, vmax=lapse_rate_nonstim + 0.15)
+        norm = mcolors.Normalize(vmin=lapse_rate_nonstim, vmax=lapse_rate_nonstim + 0.5)
+        divnorm=colors.TwoSlopeNorm(vmin =0, vcenter=lapse_rate_nonstim, vmax = lapse_rate_nonstim*4)
+        # norm = mcolors.Normalize(vmin=lapse_rate_nonstim, vmax=max(lapse_rate_results))
 
-    # Create a ScalarMappable and initialize a colormap
-    sm = plt.cm.ScalarMappable(cmap="coolwarm", norm=norm)
+        # Create a ScalarMappable and initialize a colormap
+        sm = plt.cm.ScalarMappable(cmap="coolwarm", norm=divnorm)
 
-    # Overlay the stimulation points directly since they are already in the correct scale and framework
-    for condition, coords in stim_locations.items():
-        if condition in lapse_rate_results:
-            lapse_rate = lapse_rate_results[condition]['lapse rate']
-            p_val = lapse_rate_results[condition]['p_val']
-            size = -100*np.log10(p_val)#*np.log10(p_val)
-            color = sm.to_rgba(lapse_rate)
-            alpha = 0.5 if p_val >= 0.05 else 1#max(0.1, 1 - p_val)
-            ax.scatter(coords['ML_left'], coords['AP'], color=color, alpha=alpha, edgecolors='w', s=size)
-            ax.scatter(coords['ML_right'], coords['AP'], color=color, alpha=alpha, edgecolors='w', s=size)
+        # Overlay the stimulation points directly since they are already in the correct scale and framework
+        for condition, coords in stim_locations.items():
+            if condition in lapse_rate_results:
+                lapse_rate = lapse_rate_results[condition]['lapse rate']
+                p_val = lapse_rate_results[condition]['p_val']
+                size = -100*np.log10(p_val)#*np.log10(p_val)
+                color = sm.to_rgba(lapse_rate)
+                alpha = 0.5 if p_val >= 0.05 else 1#max(0.1, 1 - p_val)
+                ax.scatter(coords['ML_left'], coords['AP'], color=color, alpha=alpha, edgecolors='w', s=size)
+                ax.scatter(coords['ML_right'], coords['AP'], color=color, alpha=alpha, edgecolors='w', s=size)
 
-    # Add labels, title, etc.
-    ax.set_ylim(bottom=-2, top=4)
-    ax.set_xlabel('Mediolateral Position (mm from Bregma)', fontsize=14)
-    ax.set_ylabel('Anteroposterior Position (mm from Bregma)', fontsize=14)
-    # ax.set_title('Effect on Time spent in Quiescent Period', fontsize=18)
+        # Add labels, title, etc.
+        ax.set_ylim(bottom=-2, top=4)
+        ax.set_xlabel('Mediolateral Position (mm from Bregma)', fontsize=14)
+        ax.set_ylabel('Anteroposterior Position (mm from Bregma)', fontsize=14)
+        # ax.set_title('Effect on Time spent in Quiescent Period', fontsize=18)
 
-    # Example p-values for the legend
-    p_values = [0.001, 0.01, 0.05, 0.2]
-    sizes = [-100 * np.log10(p) for p in p_values]
-    # Creating the scatter plot
-    # Adding a scatter plot point for each example p-value
-    for p, size in zip(p_values, sizes):
-        ax.scatter([], [], s=size, label=f'p = {p}', edgecolors='w', color='k')
-    # Adding the legend with title
-    ax.legend(loc='upper left', labelspacing=1.5)
+        # Example p-values for the legend
+        p_values = [0.001, 0.01, 0.05, 0.2]
+        sizes = [-100 * np.log10(p) for p in p_values]
+        # Creating the scatter plot
+        # Adding a scatter plot point for each example p-value
+        for p, size in zip(p_values, sizes):
+            ax.scatter([], [], s=size, label=f'p = {p}', edgecolors='w', color='k')
+        # Adding the legend with title
+        ax.legend(loc='upper left', labelspacing=1.5)
 
-    # Increase the size of the tick labels
-    ax.tick_params(axis='both', which='major', labelsize=14)  # 'both' applies changes to both x and y axis
+        # Increase the size of the tick labels
+        ax.tick_params(axis='both', which='major', labelsize=14)  # 'both' applies changes to both x and y axis
 
-    # Add a colorbar with adjusted size
-    # 'fraction' is the width of the colorbar as a fraction of the axes
-    # 'pad' is the spacing between the colorbar and the figure
-    # 'aspect' controls the ratio of the colorbar's length to its width.
-    cbar = plt.colorbar(sm, ax=ax, orientation='vertical', fraction=0.046, pad=0.04, aspect=12)
-    cbar.set_label('Lapse Rate', fontsize=14, labelpad=15)
-    cbar.ax.tick_params(labelsize=12)
-    plt.show()
+        # Add a colorbar with adjusted size
+        # 'fraction' is the width of the colorbar as a fraction of the axes
+        # 'pad' is the spacing between the colorbar and the figure
+        # 'aspect' controls the ratio of the colorbar's length to its width.
+        cbar = plt.colorbar(sm, ax=ax, orientation='vertical', fraction=0.046, pad=0.04, aspect=12)
+        cbar.set_label('Lapse Rate', fontsize=14, labelpad=15)
+        cbar.ax.tick_params(labelsize=12)
+        plt.show()
 
     ############ BIAS1
     # Assuming stim_locations is a dictionary with coordinates for each stimulation point
@@ -2326,21 +2351,50 @@ else:
     # # for condition in range(1,53):
 
     #################################### PLOT PSYCHOMETRIC #####################################
+    # Collect biases for each stim condition
+    left_block_pleft_vals_combined = []
+    right_block_pleft_vals_combined = []
+    combined_condition_data = condition_data[24] + condition_data[15] + condition_data[16] + condition_data[17] + condition_data[23] + condition_data[25]
 
-    condition = 16
+    # Collect bias values for each condition and contrast level
+    contrasts = [-100.0, -25.0, -12.5, -6.25, 0.0, 6.25, 12.5, 25.0, 100.0]
+    for contrast in contrasts:
+        stim_left_prob = calculate_choice_probability(combined_condition_data, 'left', contrast)
+        stim_right_prob = calculate_choice_probability(combined_condition_data, 'right', contrast)
+        if stim_left_prob is not None and stim_right_prob is not None:
+            left_block_pleft_vals_combined.append(stim_left_prob)
+            right_block_pleft_vals_combined.append(stim_right_prob)
+        else: #in case there are no values, just use ones from control
+            left_block_pleft_vals_combined.append(nonstim_left_prob)
+            right_block_pleft_vals_combined.append(nonstim_right_prob)
+
+    # condition = 24
     # Extract or calculate the psychometric data for the current condition
-    left_block_choices = left_block_pleft_vals[condition]
-    right_block_choices = right_block_pleft_vals[condition]
+    left_block_choices_ctrl = left_block_pleft_vals[0]
+    right_block_choices_ctrl = right_block_pleft_vals[0]
+    left_block_choices = left_block_pleft_vals_combined
+    right_block_choices = right_block_pleft_vals_combined
 
     # Plot the psychometric curves
-    plot_psychometric(contrasts, left_block_choices, right_block_choices, f'Condition {condition}')
+    # plot_psychometric(contrasts, left_block_choices, right_block_choices, f'Condition {condition}')
+    plt.figure(figsize=(10, 8))
+    plt.plot(contrasts, left_block_choices_ctrl, color='orange', label='Left Block Control')
+    plt.plot(contrasts, right_block_choices_ctrl, color='violet', label='Right Block Control')
+    plt.plot(contrasts, left_block_choices, color='orange', linestyle = 'dashed', label='Left Block')
+    plt.plot(contrasts, right_block_choices, color='violet', linestyle = 'dashed', label='Right Block')
+
+    plt.title(f'Condition {condition}')
+    plt.xlabel('Contrast')
+    plt.ylabel('% Leftward Choice')
+    plt.legend()
+    plt.show()
 
     # Wait for user input to proceed to the next plot
     # input("Press Enter to continue to the next plot...")
     # plt.close()  # This closes the current figure before the next one is drawn
 
     #################################### PLOT WHEEL ##########################################
-    ### condition defined above
+    ## condition defined above
 
     x_vals_for_plot = np.arange(0, length_of_time_to_analyze_wheel_movement, interval)
 
@@ -2451,6 +2505,6 @@ else:
 
     plt.show()
 
-### analyze wheel!
+    ### analyze wheel!
 
 
