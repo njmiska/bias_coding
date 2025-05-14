@@ -46,7 +46,7 @@ firing_rate_threshold = 1
 
 ### Options
 
-plot_each_cluster = 1
+plot_each_cluster = 0
 
 # normalize_to_baseline = 0
 
@@ -1007,17 +1007,25 @@ title_str = 'All midbrain units'
 indices_to_use = clusters_info_DF['Allenregion'].isin(['MRN'])
 title_str = 'All MRN units'
 
+###### ALL BS MRN UNITS
+indices_to_use = (clusters_info_DF['Allenregion'].isin(['MRN'])) & (clusters_info_DF['BS_score'] == 1)
+title_str = 'All BS MRN units'
+
+###### ALL BS NON-SC MIDBRAIN UNITS
+indices_to_use = (clusters_info_DF['Allenregion'].isin(['MB','MRN','RN','PPN','PAG','CUN','PRNr'])) & (clusters_info_DF['BS_score'] == 1)
+title_str = 'All BS NON-SC MIDBRAIN UNITS'
+
 ###### ALL SC UNITS
 indices_to_use = clusters_info_DF['Allenregion'].isin(['SCsg','SCzo','SCop','SCig','SCiw','SCdg'])
 title_str = 'All SC units'
 
 ###### ALL IBL 'OK' SC UNITS
 indices_to_use = (clusters_info_DF['Allenregion'].isin(['SCsg','SCzo','SCop','SCig','SCiw','SCdg'])) & (clusters_info_DF['IBL_label'] > 0.6)
-title_str = 'All SC units'
+title_str = 'All OK SC units'
 
 ###### ALL BS SC UNITS
 indices_to_use = (clusters_info_DF['Allenregion'].isin(['SCsg','SCzo','SCop','SCig','SCiw','SCdg'])) & (clusters_info_DF['BS_score'] == 1)
-title_str = 'All SC units'
+title_str = 'All BS SC units'
 
 ###### ALL BS MIDBRAIN UNITS
 indices_to_use = clusters_info_DF['Allenregion'].isin(allen_regions_formidbrain) & clusters_info_DF['BS_score'] == 1
