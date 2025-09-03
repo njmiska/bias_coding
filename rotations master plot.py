@@ -171,7 +171,6 @@ if plot_individual_mouse:
     fig, ax = plt.subplots(figsize=(6, 5))  # Smaller plot for a single brain region
 else:
     fig, ax = plt.subplots(figsize=(15, 7))  # Larger plot for the master plot
-# fig, ax = plt.subplots(figsize=(15, 7))
 bar_width = 0.25  # Increased bar width to make bars thicker
 index = np.arange(len(master_data))
 
