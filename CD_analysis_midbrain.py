@@ -593,7 +593,7 @@ import statistics
 import sys
 sys.path.append('/Users/natemiska/python/bias_coding')
 from functions_optostim import signed_contrast, peri_event_time_histogram, generate_pseudo_sessions, isbiasblockselective_03
-from metadata_optostim import pids_list_SNr_trained,pids_list_SNr_contra_trained,excitation_trials_range_list_SNr_trained,inhibition_trials_range_list_SNr_trained,excitation_trials_range_list_SNr_contra_trained,inhibition_trials_range_list_SNr_contra_trained,light_artifact_units_SNr_trained,light_artifact_units_SNr_contra_trained,pids_list_ZI_trained,pids_list_ZI_trained_contra,excitation_trials_range_list_ZI_trained,inhibition_trials_range_list_ZI_trained,excitation_trials_range_list_ZI_trained_contra,inhibition_trials_range_list_ZI_trained_contra,light_artifact_units_ZI_trained,light_artifact_units_ZI_trained_contra, pids_list_SNr_reverse, excitation_trials_range_list_SNr_reverse, inhibition_trials_range_list_SNr_reverse, light_artifact_units_SNr_reverse
+from metadata_optostim import light_artifact_units_SNr,light_artifact_units_SNr_contra,pids_list_SNr,pids_list_SNr_contra,inhibition_trials_range_list_SNr,inhibition_trials_range_list_SNr_contra,pids_list_SNr_trained,pids_list_SNr_contra_trained,excitation_trials_range_list_SNr_trained,inhibition_trials_range_list_SNr_trained,excitation_trials_range_list_SNr_contra_trained,inhibition_trials_range_list_SNr_contra_trained,light_artifact_units_SNr_trained,light_artifact_units_SNr_contra_trained,pids_list_ZI_trained,pids_list_ZI_trained_contra,excitation_trials_range_list_ZI_trained,inhibition_trials_range_list_ZI_trained,excitation_trials_range_list_ZI_trained_contra,inhibition_trials_range_list_ZI_trained_contra,light_artifact_units_ZI_trained,light_artifact_units_ZI_trained_contra, pids_list_SNr_reverse, excitation_trials_range_list_SNr_reverse, inhibition_trials_range_list_SNr_reverse, light_artifact_units_SNr_reverse
 
 one = ONE(base_url='https://alyx.internationalbrainlab.org')
 # one=ONE(mode='remote')
@@ -603,7 +603,7 @@ br = BrainRegions()
 
 #####################################################################################
 
-condition = 'SNr_forBSanalysis'#'SNr_reverse'#'ZI_forBSanalysis'#'SNr_forBSanalysis' #'SNr_directstim'#'ZI_directstim'#'ZI_contra'#'SNr_ipsi' #'SNr_contra' #'ZI_ipsi'
+condition = 'SNr_ipsi'#'SNr_forBSanalysis'#'SNr_reverse'#'ZI_forBSanalysis'#'SNr_forBSanalysis' #'SNr_directstim'#'ZI_directstim'#'ZI_contra'#'SNr_ipsi' #'SNr_contra' #'ZI_ipsi'
 
 onset_alignment = 'Laser onset' #'Laser onset' #'Go cue onset'
 
@@ -632,6 +632,26 @@ elif condition == 'SNr_reverse':
     excitation_trials_range_list = excitation_trials_range_list_SNr_reverse
     inhibition_trials_range_list = inhibition_trials_range_list_SNr_reverse
     light_artifact_units_list = light_artifact_units_SNr_reverse
+# elif condition == 'SNr_nontrained':
+#     pids = pids_list_SNr + pids_list_SNr_contra
+#     inhibition_trials_range_list = inhibition_trials_range_list_SNr + inhibition_trials_range_list_SNr_contra
+#     light_artifact_units_list = light_artifact_units_SNr + light_artifact_units_SNr_contra
+elif condition == 'SNr_ipsi':
+    pids = pids_list_SNr
+    inhibition_trials_range_list = inhibition_trials_range_list_SNr
+    light_artifact_units_list = light_artifact_units_SNr
+elif condition == 'SNr_contra':
+    pids = pids_list_SNr_contra
+    inhibition_trials_range_list = inhibition_trials_range_list_SNr_contra
+    light_artifact_units_list = light_artifact_units_SNr_contra
+
+# ### for incorporating previously calculated BS information
+# import pickle
+# clusters_info_DF = pd.read_pickle('~/python/saved_figures/' + condition + '_' + onset_alignment + '_BSdownstream_DF' '.pkl')
+
+# with open(condition + '_' + onset_alignment + '_delta_fr.pickle', 'rb') as f:
+#     data = pickle.load(f)
+
 #####################################################################################
 
 if __name__ == "__main__":
@@ -669,11 +689,12 @@ if __name__ == "__main__":
         block_IDs = (trials.probabilityLeft[inhibition_trials_range] > 0.5).astype(int)
 
         #### loads laser intervals data (currently only works for older taskData format)
+        # try:
+        #     laser_intervals = one.load_dataset(eid, '_ibl_laserStimulation.intervals')
+        #     print('finish coding laser intervals format for newer data!')
+        # except:
+        #     print('Laser intervals data not found; loading depricated taskData')
         try:
-            laser_intervals = one.load_dataset(eid, '_ibl_laserStimulation.intervals')
-            print('finish coding laser intervals format for newer data!')
-        except:
-            print('Laser intervals data not found; loading depricated taskData')
             taskData = load_data(ses_path)
             inhibition_trials_numbers = np.empty(len(taskData))
             inhibition_trials_numbers[:] = np.nan
@@ -685,71 +706,89 @@ if __name__ == "__main__":
                 else:
                     nonstim_trials_numbers[k] = k
 
-        inhibition_trials_numbers = inhibition_trials_numbers[np.isnan(inhibition_trials_numbers) == 0]
-        nonstim_trials_numbers = nonstim_trials_numbers[np.isnan(nonstim_trials_numbers) == 0]
-        n_trials = len(inhibition_trials_range)
+            inhibition_trials_numbers = inhibition_trials_numbers[np.isnan(inhibition_trials_numbers) == 0]
+            nonstim_trials_numbers = nonstim_trials_numbers[np.isnan(nonstim_trials_numbers) == 0]
+            n_trials = len(inhibition_trials_range)
 
-        #### creates boolean array to represent stim/nonstim trials in inhibition range
-        perturbation = np.isin(inhibition_trials_range, inhibition_trials_numbers)
+            #### creates boolean array to represent stim/nonstim trials in inhibition range
+            perturbation = np.isin(inhibition_trials_range, inhibition_trials_numbers)
 
-        #### creates boolean array to represent correct/incorrect trials in inhibition range
-        correct = (trials.feedbackType[inhibition_trials_range] > 0)
+            #### creates boolean array to represent correct/incorrect trials in inhibition range
+            correct = (trials.feedbackType[inhibition_trials_range] > 0)
 
-        #### Quiescent period currently fixed at 400ms - should be changed for each trial
-        sample_window = (0.0, 0.4)
-        delay_window  = (0.0, 0.4)
+            #### Quiescent period currently fixed at 400ms - should be changed for each trial
+            sample_window = (0.0, 0.4)
+            delay_window  = (0.0, 0.4)
 
-        #### define rng
-        rng = np.random.default_rng(0)
+            #### define rng
+            rng = np.random.default_rng(0)
 
-        #### 1) define quiescent start/end and trial start (absolute)
-        goCue_abs      = trials['goCue_times'][inhibition_trials_range]
-        qp_rel         = trials['quiescencePeriod'][inhibition_trials_range]
-        q_start_abs = goCue_abs - qp_rel
-        q_end_abs   = goCue_abs
-        trial_start_abs = trials['intervals'][inhibition_trials_range][:,0]
-        
-        #### 2) align X to **trial start / laser onset**
-        if onset_alignment == 'Laser onset':
-            align_times = trial_start_abs
-            X, time, unit_ids = build_binned_X(
-                allspikes['times'], allspikes['clusters'],
-                thresholded_cluster_IDs, align_times,
-                t_before, t_after, bin_size, as_rate=False
+            #### 1) define quiescent start/end and trial start (absolute)
+            goCue_abs      = trials['goCue_times'][inhibition_trials_range]
+            enforced_qp_len        = trials['quiescencePeriod'][inhibition_trials_range]
+            enforced_qp_start_abs = goCue_abs - enforced_qp_len
+            enforced_qp_end_abs   = goCue_abs
+            trial_start_abs = trials['intervals'][inhibition_trials_range][:,0]
+
+            #### 2) align X to **trial start / laser onset**
+            if onset_alignment == 'Laser onset':
+                align_times = trial_start_abs
+                X, time, unit_ids = build_binned_X(
+                    allspikes['times'], allspikes['clusters'],
+                    thresholded_cluster_IDs, align_times,
+                    t_before, t_after, bin_size, as_rate=False
+                )
+            else:
+                print('Pipeline not yet setup for onset alignment outside of Laser/Trial start!')
+
+            #### create epoch_mask, ie defines relative times to use for computing cd
+            goCue_rel = goCue_abs - align_times
+            enforced_qp_start_rel = enforced_qp_start_abs - align_times          # QP start time relative to onset alignment
+            enforced_qp_end_rel   = enforced_qp_end_abs - align_times            # QP end time relative to onset alignment
+
+            #### There is a potential issue here, which is that the enforced quiescent period time may sit outside the mask
+            epoch_mask  = make_interval_mask(time, enforced_qp_start_rel, enforced_qp_end_rel)
+            # epoch_mask  = make_interval_mask(time, qp_enforced_start_rel, qp_enforced_end_rel)
+
+            # ### sanity check
+            # # 0 s must be inside the mask for (almost) all trials
+            # zero_idx = int(np.argmin(np.abs(time - 0.0)))
+            # print("mask@0s (fraction True):", np.mean(epoch_mask[:, zero_idx]))
+            
+            # # mask starts near 0 and ends near qp_i
+            # starts = time[np.argmax(epoch_mask, axis=1)]
+            # ends   = time[epoch_mask.argmax(1) + epoch_mask.sum(1) - 1]
+            # print("start (median, IQR):", np.nanmedian(starts), np.nanpercentile(starts, [25, 75]))
+            # print("end   (median, IQR):", np.nanmedian(ends),   np.nanpercentile(ends,   [25, 75]))
+            # ###
+
+            #### run pipeline
+            res = run_cd_pipeline(
+                X, time, block_IDs, perturbation, correct=correct,
+                epoch_mask=epoch_mask,
+                bin_size_ms=bin_size*1000.0, window_ms=200.0,
+                n_boot=2000, seed=1,
+                eval_time_s=0.0,                       # onset
+                # or: eval_time_s=float(np.nanmedian(q_end_rel))  # go cue
             )
-        else:
-            print('Pipeline not yet setup for onset alignment outside of Laser/Trial start!')
-        
-        #### create epoch_mask, ie defines relative times to use for computing cd
-        goCue_rel = goCue_abs - align_times
-        qp_enforced_start_rel = goCue_rel - qp_rel   # QP start time relative to onset alignment
-        qp_enforced_end_rel   = goCue_rel            # QP end time relative to onset alignment
-
-        ####### I THINK THIS IS STILL WRONG
-        epoch_mask  = make_interval_mask(time, qp_enforced_start_rel, qp_enforced_end_rel)
-
-        ### sanity check
-        # 0 s must be inside the mask for (almost) all trials
-        zero_idx = int(np.argmin(np.abs(time - 0.0)))
-        print("mask@0s (fraction True):", np.mean(epoch_mask[:, zero_idx]))
-        
-        # mask starts near 0 and ends near qp_i
-        starts = time[np.argmax(epoch_mask, axis=1)]
-        ends   = time[epoch_mask.argmax(1) + epoch_mask.sum(1) - 1]
-        print("start (median, IQR):", np.nanmedian(starts), np.nanpercentile(starts, [25, 75]))
-        print("end   (median, IQR):", np.nanmedian(ends),   np.nanpercentile(ends,   [25, 75]))
-        ###
-
-        #### run pipeline
-        res = run_cd_pipeline(
-            X, time, block_IDs, perturbation, correct=correct,
-            epoch_mask=epoch_mask,
-            bin_size_ms=bin_size*1000.0, window_ms=200.0,
-            n_boot=2000, seed=1,
-            eval_time_s=0.0,                       # onset
-            # or: eval_time_s=float(np.nanmedian(q_end_rel))  # go cue
-        )
-        
-        plot_trajectories(res, title=f'CD Projections — Control vs Opto, Block 0/1 (pid={pid})')
 
 
+            # indices_for_ALL = clusters_info_DF['pid'] == pid
+            # indices_for_BS = (clusters_info_DF['pid'] == pid) & (clusters_info_DF['BS_score'] == 1)
+
+            # num_ALL_units = len(np.where(indices_for_ALL == True)[0])
+            # num_BS_units = len(np.where(indices_for_BS == True)[0])
+
+            # if pid in pids_list_SNr_trained:
+            #     hemisphere = 'ipsi'
+            # else:
+            #     hemisphere = 'contra'
+
+            print('pid = ' + pid)
+            # print('Total num units = ' + str(num_ALL_units))
+            # print('Total num BS units = ' + str(num_BS_units))
+            print('Total num trials = ' + str(n_trials))
+
+            plot_trajectories(res, title=f'CD Projections — Control vs Opto, Block 0/1 (pid={pid})')
+        except:
+            print('Error loading pid = ' + pid + '. Skipping to next session...')
