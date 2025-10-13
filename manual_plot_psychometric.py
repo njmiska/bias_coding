@@ -6,7 +6,7 @@ import pandas as pd
 import seaborn as sns
 from ibllib.io.raw_data_loaders import load_data
 from one.api import ONE
-import brainbox.behavior.pyschofit as psy
+import psychofit as psy
 # from ibl_pipeline import behavior, acquisition, subject
 # from ibl_pipeline.analyses.behavior import PsychResultsBlock, PsychResults
 from scipy import stats
@@ -42,7 +42,7 @@ stim_rt_min = 0
 django_str = []
 ins = one.alyx.rest('insertions', 'list', django=django_str)
 
-eid = 'b9bd876e-76c1-4824-8087-a39ae72da73f'
+eid = 'ff6d16d7-b6b3-461a-b688-494a717c3d7d'
 trials = one.load_object(eid, 'trials')
 # trials = one.load_object(eid, object="trials", namespace="ibl")
 try:
@@ -54,8 +54,9 @@ except:
     print('no raw task data found...')
 
 trials_range = list(range(0, np.size(trials.probabilityLeft)))
+# trials_range = list(range(0, 709))
 # trials_range = list(range(0,69))+list(range(197,320))
-# trials_range = list(range(102, 249)) + list(range(500, np.size(trials.probabilityLeft)))
+# trials_range = list(range(139,242)) + list(range(364,461)) + list(range(581,674)) + list(range(769,798))
 
 # trials_range = list(range(90, 400))
 # trials_range = list(range(637, np.size(trials.probabilityLeft)))
@@ -73,9 +74,9 @@ print('numtrials =', str(len(trials['contrastLeft'])))
 stim_trials = trials.copy()
 nonstim_trials = trials.copy()
 stim_trials_numbers = np.empty(len(trials['contrastLeft']))
-stim_trials_numbers[:] = np.NaN
+stim_trials_numbers[:] = np.nan
 nonstim_trials_numbers = np.empty(len(trials['contrastLeft']))
-nonstim_trials_numbers[:] = np.NaN
+nonstim_trials_numbers[:] = np.nan
 try:
     for k in trials_range:
         if taskData[k]['opto'] == 1:
@@ -283,7 +284,7 @@ f.show()
 # plt.show()
 
 # abs_react_stim = np.empty([np.size(stim_trials_numbers)])
-# abs_react_stim[:] = np.NaN
+# abs_react_stim[:] = np.nan
 # for i in np.arange(0,np.size(stim_trials_numbers)):
 #     trial_num = stim_trials_numbers[i]
 #     # trial_start_time_stim = taskData[trial_num]['behavior_data']['Trial start timestamp']
@@ -295,7 +296,7 @@ f.show()
 #         abs_react_stim[i] = taskData[trial_num]['behavior_data']['States timestamps']['error'][0][0] - relative_trial_start
 
 # abs_react_nonstim = np.empty([np.size(nonstim_trials_numbers)])
-# abs_react_nonstim[:] = np.NaN
+# abs_react_nonstim[:] = np.nan
 # for i in np.arange(0,np.size(nonstim_trials_numbers)):
 #     trial_num = nonstim_trials_numbers[i]
 #     # trial_start_time_nonstim = taskData[trial_num]['behavior_data']['Trial start timestamp']
@@ -317,9 +318,9 @@ f.show()
 
 
 reaction_times = np.empty([np.size(trials['contrastLeft'])])
-reaction_times[:] = np.NaN
+reaction_times[:] = np.nan
 quiescent_period_times = np.empty([np.size(trials['contrastLeft'])])
-quiescent_period_times[:] = np.NaN
+quiescent_period_times[:] = np.nan
 for tr in range(len(trials['contrastLeft'])):
     stimOn_time = trials['stimOn_times'][tr]
     if np.isnan(stimOn_time) == 1:
