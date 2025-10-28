@@ -37,14 +37,28 @@ pids_list_SNr = ['518b61c2-45bc-40c2-bee1-d87b0d1986ac','e4696ffd-248e-41cb-a62a
                  # SWC_NM_027! (7/9 and 8/9) need to manually check each trial for stim...
 pids_list_SNr_trained = ['518b61c2-45bc-40c2-bee1-d87b0d1986ac','e4696ffd-248e-41cb-a62a-16e320b8cd7e', #SWC_NM_018 15/6, SWC_NM_018 16/6
                          '59bf32ee-1d83-4a7f-bf14-590b610c96e0', #SWC_NM_018 17/6 (few trials)
-                         '0d60096b-a037-4b6f-a50c-ff469298ba71'] #SWC_NM_012 (poor/random stim trial performance)
+                         '0d60096b-a037-4b6f-a50c-ff469298ba71', #SWC_NM_012 (poor/random stim trial performance)
+                         '930adc32-438a-4548-a741-dc8a487ebd4f', #SWC_NM_096 23/11 L probe
+                         '7778d726-767e-4d1b-a879-01faf2075828', #SWC_NM_096 24/11 R probe
+                         '068538e4-08a7-4d11-a807-e9cf698d63b8', #SWC_NM_096 25/11 L probe
+                         '72b7c463-ed30-4c24-8ddf-5e8eddafc46e', #SWC_NM_096 26/11 R probe
+                         'f88afd14-4b96-4833-a463-536f66d30592', #SWC_NM_097 23/11 R probe
+                         '3e83939c-b401-427e-94d9-e76ef4c1755f', #SWC_NM_097 24/11 R probe
+                         '9fd3bd93-e5bf-42d1-ab69-16da50cbaf6b'] #SWC_NM_097 25/11 L probe
+                         
 
 pids_list_SNr_contra = ['b96ed9ce-1a0a-4818-b896-8aa79ca26801','b7998d00-b4c4-4695-8fc3-f8001539c90e', #SWC_NM_018 15/6, SWC_NM_018 16/6
                         'eb0937f5-951b-4bf8-9dc4-83ed776a1503', #SWC_NM_018 17/6 (few trials)
                         '3f9ff280-98b2-478a-b38f-b49294923756', #SWC_NM_021 24/3
                         '06cdb7a7-df86-48ea-8533-b1e383436987', 'a9c28dc5-6e1d-4750-8fff-1113ed26e6e9'] # SWC_NM_016
 pids_list_SNr_contra_trained = ['b96ed9ce-1a0a-4818-b896-8aa79ca26801','b7998d00-b4c4-4695-8fc3-f8001539c90e', #SWC_NM_018 15/6, SWC_NM_018 16/6
-                                'eb0937f5-951b-4bf8-9dc4-83ed776a1503'] #SWC_NM_018 17/6 (few trials) - shit session
+                                'eb0937f5-951b-4bf8-9dc4-83ed776a1503', #SWC_NM_018 17/6 (few trials) - shit session
+                                'caf25d31-2d5b-45a9-85b4-585e380ebab2', #SWC_NM_096 23/11 R probe
+                                '7a79b7cf-4d29-4a83-8d33-6bd3e4ef3307', #SWC_NM_096 24/11 L probe
+                                '94a5c20d-82be-4040-80cc-03ef2e5854df', #SWC_NM_096 25/11 R probe
+                                '3dd67257-217e-4d25-bb2b-59a606d944a7', #SWC_NM_096 26/11 L probe
+                                '45627303-535d-4f08-b88a-f1e27d841cf6', #SWC_NM_097 23/11 L probe
+                                '8c36f12e-3ca8-4c14-8d7f-73c8f38cf397'] #SWC_NM_097 25/11 R probe
 
 excitation_trials_range_list_SNr = [list(range(242,364)) + list(range(461,581)) + list(range(674,769)), #SWC_NM_018 15/6
                                     list(range(283,423)) + list(range(528,660)) + list(range(767,833)), #SWC_NM_018 16/6
@@ -68,12 +82,26 @@ inhibition_trials_range_list_SNr = [list(range(139,242)) + list(range(364,461)) 
 excitation_trials_range_list_SNr_trained = [list(range(242,364)) + list(range(461,581)) + list(range(674,769)), #SWC_NM_018 15/6
                                     list(range(283,423)) + list(range(528,660)) + list(range(767,833)), #SWC_NM_018 16/6
                                     list(range(371,422)) + list(range(485,501)), #SWC_NM_018 17/6
-                                    list(range(180,369))] #SWC_NM_012]
+                                    list(range(180,369)), #SWC_NM_012
+                                    [], #96
+                                    [], #96
+                                    [], #96
+                                    [], #96
+                                    [], #97
+                                    [], #97
+                                    []] #97
 
 inhibition_trials_range_list_SNr_trained = [list(range(139,242)) + list(range(364,461)) + list(range(581,674)) + list(range(769,798)), #SWC_NM_018 15/6
                                     list(range(121,283)) + list(range(423,528)) + list(range(660,767)), #SWC_NM_018 16/6
                                     list(range(422,485)), #SWC_NM_018 17/6
-                                    list(range(75,180))] #SWC_NM_012
+                                    list(range(75,180)), #SWC_NM_012
+                                    list(range(0,410)) + list(range(516,776)), #96
+                                    'ALL', #96
+                                    'ALL', #96
+                                    'ALL', #96
+                                    'ALL', #97
+                                    'ALL', #97
+                                    'ALL'] #97
 
 excitation_trials_range_list_SNr_contra = [list(range(242,364)) + list(range(461,581)) + list(range(674,769)), #SWC_NM_018 15/6
                                     list(range(283,423)) + list(range(528,660)) + list(range(767,833)), #SWC_NM_018 16/6
@@ -89,17 +117,36 @@ inhibition_trials_range_list_SNr_contra = [list(range(139,242)) + list(range(364
                                     list(range(0,69)) + list(range(197,320))] # SWC_NM_016
 excitation_trials_range_list_SNr_contra_trained = [list(range(242,364)) + list(range(461,581)) + list(range(674,769)), #SWC_NM_018 15/6
                                     list(range(283,423)) + list(range(528,660)) + list(range(767,833)), #SWC_NM_018 16/6
-                                    list(range(371,422)) + list(range(485,501))] #SWC_NM_018 17/6
+                                    list(range(371,422)) + list(range(485,501)), #SWC_NM_018 17/6
+                                    [], #96
+                                    [], #96
+                                    [], #96
+                                    [], #96
+                                    [], #97
+                                    []] #97
 inhibition_trials_range_list_SNr_contra_trained = [list(range(139,242)) + list(range(364,461)) + list(range(581,674)) + list(range(769,798)), #SWC_NM_018 15/6
                                     list(range(121,283)) + list(range(423,528)) + list(range(660,767)), #SWC_NM_018 16/6
-                                    list(range(422,485))] #SWC_NM_018 17/6
+                                    list(range(422,485)), #SWC_NM_018 17/6
+                                    list(range(0,410)) + list(range(516,776)), #96
+                                    'ALL', #96
+                                    'ALL', #96
+                                    'ALL', #96
+                                    'ALL', #97
+                                    'ALL'] #97
 
 light_artifact_units_SNr = [[0,3,4,5,6,7,8],[[62,125,227]], #SWC_NM_018 16/6
                             [83,87,125,148,153],[],[38,86,193,283],[],[],[], #SWC_NM_018 17/6, #SWC_NM_021 22/3
                             [1,4,5,10,11,59,162,173,175,206]]
 
 light_artifact_units_SNr_trained = [[0,3,4,5,6,7,8],[[62,125,227]], #SWC_NM_018 16/6
-                                    [83,87,125,148,153],[]] #SWC_NM_018 17/6, SWC_NM_012
+                                    [83,87,125,148,153],[], #SWC_NM_018 17/6, SWC_NM_012
+                                    [], #96
+                                    [], #96
+                                    [], #96
+                                    [], #96
+                                    [], #97
+                                    [], #97
+                                    []] #97
 
 light_artifact_units_SNr_contra = [[127,128,146,147,203], #SWC_NM_018 15/6
                                     [3,119,139,148,178,187,244,254,255,258], #SWC_NM_018 16/6
@@ -108,7 +155,13 @@ light_artifact_units_SNr_contra = [[127,128,146,147,203], #SWC_NM_018 15/6
 
 light_artifact_units_SNr_contra_trained = [[127,128,146,147,203], #SWC_NM_018 15/6
                                     [3,119,139,148,178,187,244,254,255,258], #SWC_NM_018 16/6
-                                    [84,219]]
+                                    [84,219],
+                                    [], #96
+                                    [], #96
+                                    [], #96
+                                    [], #96
+                                    [], #97
+                                    []] #97
 
 pids_list_ZI = ['0022179b-0101-48b0-b60f-c5de8ed3761d', 'ccfb329e-c3b0-43be-9710-5d7c8ee968d2',  #SWC_NM_020 22/3/22, #SWC_NM_020 23/3/22 (mostly ZI/thal, but also lots of MB units)
                 'ddeb1b23-1c38-486c-83a9-237a81df6aaa', '6f890ac3-0ac7-441b-9896-515124ab2035', #SWC_NM_020 24/3/22, #SWC_NM_023 24/8/22
@@ -219,3 +272,25 @@ light_artifact_units_ZI_directstim =  [[23,35,55,97,162,206,369] + list(range(28
                                        [77,80,93,102,106,107,126,127,321,339,364,365,366], #questionable:106
                                        [288,430,454,467,481],[288,386],
                                        [],[],[]] #SWC_NM_032
+
+pids_list_SNr_reverse = [#'67f49438-f321-4c86-bfe9-a74f7c2942d0', #SWC_AY_006 23/4
+                        #  '09c72132-29c9-4db4-843f-e9b9aca468d3', #SWC_AY_006 24/4 L
+                        #  '6c37a367-f9b6-4f13-8e14-661093ac757d', #SWC_AY_006 24/4 R
+                         '8743ad3f-da95-4be4-bc6d-d925f01226ab', #SWC_AY_006 25/4 L
+                         'ef9f6406-99f9-4548-b2f7-5b80e602bb24']#, #SWC_AY_006 25/4 R
+                        #  '7c2d4fd3-7263-4974-95da-79f24cbc2864', '9e7ca264-78c4-436c-bd1d-cc76c7783035'] #SWC_AY_010 24/4, 25/4
+
+excitation_trials_range_list_SNr_reverse = [#[],
+                                            [],#[],
+                                            []]#,[]]#,
+                                          #   [],[]]
+
+inhibition_trials_range_list_SNr_reverse = [#list(range(107,291)),
+                                          #   list(range(0,538)),#list(range(0,538)),
+                                            list(range(0,702)),list(range(0,702))]#, #SWC_AY_006 25/4 L, R
+                                          #   list(range(0,508)),list(range(0,633))] #SWC_AY_010 24/4, 25/4
+
+light_artifact_units_SNr_reverse = [#[],
+                                    [],#[],
+                                    []]#,[]]#,
+                                    # [],[]]

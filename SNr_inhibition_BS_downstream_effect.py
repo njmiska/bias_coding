@@ -16,37 +16,45 @@ from iblatlas.atlas import AllenAtlas, BrainRegions
 # from ibl_pipeline.analyses.behavior import PsychResultsBlock, PsychResults
 from scipy import stats
 import statistics
+from pathlib import Path
 
 import sys
 sys.path.append('/Users/natemiska/python/bias_coding')
-from functions_optostim import signed_contrast, peri_event_time_histogram, generate_pseudo_sessions, isbiasblockselective_03
-from metadata_optostim import pids_list_SNr_trained,pids_list_SNr_contra_trained,excitation_trials_range_list_SNr_trained,inhibition_trials_range_list_SNr_trained,excitation_trials_range_list_SNr_contra_trained,inhibition_trials_range_list_SNr_contra_trained,light_artifact_units_SNr_trained,light_artifact_units_SNr_contra_trained,pids_list_ZI_trained,pids_list_ZI_trained_contra,excitation_trials_range_list_ZI_trained,inhibition_trials_range_list_ZI_trained,excitation_trials_range_list_ZI_trained_contra,inhibition_trials_range_list_ZI_trained_contra,light_artifact_units_ZI_trained,light_artifact_units_ZI_trained_contra
+from functions_optostim import signed_contrast, peri_event_time_histogram, generate_pseudo_sessions, isbiasblockselective_perm_vector
+from metadata_optostim import pids_list_SNr_trained,pids_list_SNr_contra_trained,excitation_trials_range_list_SNr_trained,inhibition_trials_range_list_SNr_trained,excitation_trials_range_list_SNr_contra_trained,inhibition_trials_range_list_SNr_contra_trained,light_artifact_units_SNr_trained,light_artifact_units_SNr_contra_trained,pids_list_ZI_trained,pids_list_ZI_trained_contra,excitation_trials_range_list_ZI_trained,inhibition_trials_range_list_ZI_trained,excitation_trials_range_list_ZI_trained_contra,inhibition_trials_range_list_ZI_trained_contra,light_artifact_units_ZI_trained,light_artifact_units_ZI_trained_contra, pids_list_SNr_reverse, excitation_trials_range_list_SNr_reverse, inhibition_trials_range_list_SNr_reverse, light_artifact_units_SNr_reverse
 
-one = ONE(base_url='https://alyx.internationalbrainlab.org')
+# one = ONE(base_url='https://alyx.internationalbrainlab.org')
+# one=ONE(mode='remote')
+
+one = ONE(base_url='https://alyx.internationalbrainlab.org', cache_dir=Path.home() / '/Users/natemiska/Downloads/ONE/alyx.internationalbrainlab.org')
+# temporarily uses local cache
+
 ba = AllenAtlas()
 br = BrainRegions()
 
 #####################################################################################
 #####################################################################################
 #####################################################################################
-condition = 'ZI_forBSanalysis'#'ZI_forBSanalysis'#'SNr_forBSanalysis' #'SNr_directstim'#'ZI_directstim'#'ZI_contra'#'SNr_ipsi' #'SNr_contra' #'ZI_ipsi'
+condition = 'SNr_forBSanalysis'#'SNr_reverse'#'ZI_forBSanalysis'#'SNr_forBSanalysis' #'SNr_directstim'#'ZI_directstim'#'ZI_contra'#'SNr_ipsi' #'SNr_contra' #'ZI_ipsi'
 
 onset_alignment = 'Laser onset' #'Laser onset' #'Go cue onset'
 
-t_before = 10
-t_after = 20
+t_before = 10#2.5#10
+t_after = 20#5#20
 
 ### Parameters
 bin_size=0.05
 smoothing=0.05
 
-IBL_quality_label_threshold = 0.3
+IBL_quality_label_threshold = 0.6
 
 firing_rate_threshold = 1
 
 ### Options
 
 plot_each_cluster = 0
+plot_only_BS_units = 0
+only_plot_FR = 0
 
 # normalize_to_baseline = 0
 
@@ -72,6 +80,11 @@ elif condition == 'ZI_forBSanalysis':
     excitation_trials_range_list = excitation_trials_range_list_ZI_trained + excitation_trials_range_list_ZI_trained_contra
     inhibition_trials_range_list = inhibition_trials_range_list_ZI_trained + inhibition_trials_range_list_ZI_trained_contra
     light_artifact_units_list = light_artifact_units_ZI_trained + light_artifact_units_ZI_trained_contra
+elif condition == 'SNr_reverse':
+    pids = pids_list_SNr_reverse
+    excitation_trials_range_list = excitation_trials_range_list_SNr_reverse
+    inhibition_trials_range_list = inhibition_trials_range_list_SNr_reverse
+    light_artifact_units_list = light_artifact_units_SNr_reverse
 
 # if condition == 'SNr_ipsi':
 #     pids = pids_list_SNr
@@ -127,7 +140,7 @@ clusters_info_DF = pd.DataFrame()
 normalize_to_baseline = 0
 
 ##### start main loop
-for main_loop_num in np.arange(0,np.size(pids)):
+for main_loop_num in np.arange(5,np.size(pids)):
 
     pid = pids[main_loop_num]
     print('starting analysis of pid = ' + pid)
@@ -136,7 +149,7 @@ for main_loop_num in np.arange(0,np.size(pids)):
     eid = ssl.eid
     trials = one.load_object(eid, 'trials')
     dset = '_iblrig_taskData.raw*'
-    data_behav = one.load_dataset(eid, dataset=dset, collection='raw_behavior_data')
+    # data_behav = one.load_dataset(eid, dataset=dset, collection='raw_behavior_data')
     ses_path = one.eid2path(eid)
 
     # LFP_data = load_lfp(eid, one=one, dataset_types=None)
@@ -146,7 +159,7 @@ for main_loop_num in np.arange(0,np.size(pids)):
     inhibition_trials_range = inhibition_trials_range_list[main_loop_num]
 
     probe_label = ssl.pname
-    spikes, clusters, channels = ssl.load_spike_sorting()
+    spikes, clusters, channels = ssl.load_spike_sorting(enforce_version=False)
     clusters = ssl.merge_clusters(spikes, clusters, channels)
     spike_wfs = one.load_object(ssl.eid, '_phy_spikes_subset', collection=ssl.collection)
     wf_clusterIDs = spikes['clusters'][spike_wfs['spikes']]
@@ -164,37 +177,85 @@ for main_loop_num in np.arange(0,np.size(pids)):
     nonstim_trials = trials.copy()
     nonstim_trials_ex = trials.copy()
     nonstim_trials_in = trials.copy()
-    taskData = load_data(ses_path)
-    excitation_trials_numbers = np.empty(len(taskData))
-    excitation_trials_numbers[:] = np.NaN
-    inhibition_trials_numbers = np.empty(len(taskData))
-    inhibition_trials_numbers[:] = np.NaN
-    nonstim_trials_numbers = np.empty(len(taskData))
-    nonstim_trials_numbers[:] = np.NaN
-    nonstim_trials_numbers_ex = np.empty(len(taskData))
-    nonstim_trials_numbers_ex[:] = np.NaN
-    nonstim_trials_numbers_in = np.empty(len(taskData))
-    nonstim_trials_numbers_in[:] = np.NaN
-    for k in excitation_trials_range:
-        if taskData[k]['opto'] == 1:
-            # react = trials['feedback_times'][k] - trials['goCue_times'][k]
-            # if react < stim_rt_threshold:
-            excitation_trials_numbers[k] = k
-        else:
-            # react = trials['feedback_times'][k] - trials['goCue_times'][k]
-            # if react < stim_rt_threshold:
-            nonstim_trials_numbers[k] = k
-            nonstim_trials_numbers_ex[k] = k
-    for k in inhibition_trials_range:
-        if taskData[k]['opto'] == 1:
-            # react = trials['feedback_times'][k] - trials['goCue_times'][k]
-            # if react < stim_rt_threshold:
-            inhibition_trials_numbers[k] = k
-        else:
-            # react = trials['feedback_times'][k] - trials['goCue_times'][k]
-            # if react < stim_rt_threshold:
-            nonstim_trials_numbers[k] = k
-            nonstim_trials_numbers_in[k] = k
+
+    try:
+        laser_intervals = one.load_dataset(eid, '_ibl_laserStimulation.intervals')
+        excitation_trials_numbers = np.empty(len(trials.contrastLeft))
+        excitation_trials_numbers[:] = np.nan
+        inhibition_trials_numbers = np.empty(len(trials.contrastLeft))
+        inhibition_trials_numbers[:] = np.nan
+        nonstim_trials_numbers = np.empty(len(trials.contrastLeft))
+        nonstim_trials_numbers[:] = np.nan
+        nonstim_trials_numbers_ex = np.empty(len(trials.contrastLeft))
+        nonstim_trials_numbers_ex[:] = np.nan
+        nonstim_trials_numbers_in = np.empty(len(trials.contrastLeft))
+        nonstim_trials_numbers_in[:] = np.nan
+
+        ### conditional statement for assigning trials to 'excitation' trial, 'inhibition' trial, or nonstim trial
+        if inhibition_trials_range == 'ALL':
+            inhibition_trials_range = range(0,len(trials['contrastLeft']))
+            #### use last trial as end of range when end of range set to 9999
+
+        for k in range(0,len(trials.contrastLeft)-1):
+            if trials.intervals[k,0] in laser_intervals[:,0] and k in excitation_trials_range:
+                excitation_trials_numbers[k] = k
+            elif trials.intervals[k,0] in laser_intervals[:,0] and k in inhibition_trials_range:
+                inhibition_trials_numbers[k] = k
+            else:
+                nonstim_trials_numbers[k] = k
+        # for k in excitation_trials_range:
+        #     if trials.intervals[k,0] in laser_intervals[:,0]:
+        #         # react = trials['feedback_times'][k] - trials['goCue_times'][k]
+        #         # if react < stim_rt_threshold:
+        #         excitation_trials_numbers[k] = k
+        #     else:
+        #         # react = trials['feedback_times'][k] - trials['goCue_times'][k]
+        #         # if react < stim_rt_threshold:
+        #         nonstim_trials_numbers[k] = k
+        #         nonstim_trials_numbers_ex[k] = k
+        # for k in inhibition_trials_range:
+        #     if trials.intervals[k,0] in laser_intervals[:,0]:
+        #         # react = trials['feedback_times'][k] - trials['goCue_times'][k]
+        #         # if react < stim_rt_threshold:
+        #         inhibition_trials_numbers[k] = k
+        #     else:
+        #         # react = trials['feedback_times'][k] - trials['goCue_times'][k]
+        #         # if react < stim_rt_threshold:
+        #         nonstim_trials_numbers[k] = k
+        #         nonstim_trials_numbers_in[k] = k
+
+    except:
+        print('Laser intervals data not found; loading depricated taskData')
+        taskData = load_data(ses_path)
+        excitation_trials_numbers = np.empty(len(taskData))
+        excitation_trials_numbers[:] = np.nan
+        inhibition_trials_numbers = np.empty(len(taskData))
+        inhibition_trials_numbers[:] = np.nan
+        nonstim_trials_numbers = np.empty(len(taskData))
+        nonstim_trials_numbers[:] = np.nan
+        nonstim_trials_numbers_ex = np.empty(len(taskData))
+        nonstim_trials_numbers_ex[:] = np.nan
+        nonstim_trials_numbers_in = np.empty(len(taskData))
+        nonstim_trials_numbers_in[:] = np.nan
+        for k in range(0,len(trials.contrastLeft)-1):
+            if taskData[k]['opto'] == 1 and k in excitation_trials_range:
+                excitation_trials_numbers[k] = k
+            elif taskData[k]['opto'] == 1 and k in inhibition_trials_range:
+                inhibition_trials_numbers[k] = k
+            else:
+                nonstim_trials_numbers[k] = k
+        # for k in excitation_trials_range:
+        #     if taskData[k]['opto'] == 1:
+        #         excitation_trials_numbers[k] = k
+        #     else:
+        #         nonstim_trials_numbers[k] = k
+        #         nonstim_trials_numbers_ex[k] = k
+        # for k in inhibition_trials_range: 
+        #     if taskData[k]['opto'] == 1:
+        #         inhibition_trials_numbers[k] = k
+        #     else:
+        #         nonstim_trials_numbers[k] = k
+        #         nonstim_trials_numbers_in[k] = k
 
     excitation_trials_numbers = excitation_trials_numbers[~np.isnan(excitation_trials_numbers)]
     inhibition_trials_numbers = inhibition_trials_numbers[~np.isnan(inhibition_trials_numbers)]
@@ -335,7 +396,12 @@ for main_loop_num in np.arange(0,np.size(pids)):
     nonstim_trials_ex_contrast = signed_contrast(nonstim_trials_ex)
     nonstim_trials_in_contrast = signed_contrast(nonstim_trials_in)
 
-    brain_acronyms_percluster = clusters['acronym']
+    try:
+        brain_acronyms_percluster = clusters['acronym']
+    except:
+        brain_acronyms_percluster = np.empty(len(clusters['ks2_label']))
+        brain_acronyms_percluster[:] = np.nan
+
 
     ######copypasta ; turn this shit into a function or something
     trials_leftprob = trials.probabilityLeft
@@ -419,10 +485,10 @@ for main_loop_num in np.arange(0,np.size(pids)):
 
     ###############
     ### could use nonstim_trials_numbers_in, though that includes less trials and also is not what is used for BS calculation
-    nonstim_trials_numbers_on_80_block = list(set(nonstim_trials_numbers_in).intersection(alltrialcounts_80_index_filtered))
-    nonstim_trials_numbers_on_20_block = list(set(nonstim_trials_numbers_in).intersection(alltrialcounts_20_index_filtered))
-    # nonstim_trials_numbers_on_80_block = list(set(nonstim_trials_numbers).intersection(alltrialcounts_80_index_filtered))
-    # nonstim_trials_numbers_on_20_block = list(set(nonstim_trials_numbers).intersection(alltrialcounts_20_index_filtered))
+    # nonstim_trials_numbers_on_80_block = list(set(nonstim_trials_numbers_in).intersection(alltrialcounts_80_index_filtered))
+    # nonstim_trials_numbers_on_20_block = list(set(nonstim_trials_numbers_in).intersection(alltrialcounts_20_index_filtered))
+    nonstim_trials_numbers_on_80_block = list(set(nonstim_trials_numbers).intersection(alltrialcounts_80_index_filtered))
+    nonstim_trials_numbers_on_20_block = list(set(nonstim_trials_numbers).intersection(alltrialcounts_20_index_filtered))
 
     inhibition_trials_80 = trials.copy()
     inhibition_trials_20 = trials.copy()
@@ -492,7 +558,7 @@ for main_loop_num in np.arange(0,np.size(pids)):
             continue
         if clusters_labels[j] < IBL_quality_label_threshold:
             continue
-        print('cluster # = ' + str(j) + ', label = ' + str(clusters_labels[j]) + ', depth = ' + str(clusters.depths[j]) + ', region = ' + brain_acronyms_percluster[j])
+        print('cluster # = ' + str(j) + ', label = ' + str(clusters_labels[j]) + ', depth = ' + str(clusters.depths[j]) + ', region = ' + str(brain_acronyms_percluster[j]))
 
         # brain_region = brain_acronyms_percluster[j]
 
@@ -532,8 +598,12 @@ for main_loop_num in np.arange(0,np.size(pids)):
 
         # try:
         if plot_each_cluster == 1:
-            plt.rcParams["figure.figsize"] = (15,6)
-            fig, (ax1,ax2,ax3) = plt.subplots(1, 3)
+            if only_plot_FR == 1:
+                plt.rcParams["figure.figsize"] = (7,5)
+                fig, (ax1) = plt.subplots(1, 1)
+            else:
+                plt.rcParams["figure.figsize"] = (15,6)
+                fig, (ax1,ax2,ax3) = plt.subplots(1, 3)
         else:
             ax1 = None
             ax2 = None
@@ -567,8 +637,8 @@ for main_loop_num in np.arange(0,np.size(pids)):
                                     n_rasters=55,  # How many raster traces to include
                                     ax=ax1,  # Make sure we plot to the axis we created
                                     yticks=False,
-                                    pethline_kwargs={'color': 'blue', 'lw': 2},
-                                    errbar_kwargs={'color': 'blue', 'alpha': 0.5},
+                                    pethline_kwargs={'color': 'xkcd:violet', 'lw': 2},
+                                    errbar_kwargs={'color': 'xkcd:violet', 'alpha': 0.4},
                                     eventline_kwargs={'color': 'black', 'alpha': 0},
                                     raster_kwargs={'color': 'black', 'lw': 0.5},
                                     normalize_to_baseline = normalize_to_baseline)
@@ -585,8 +655,8 @@ for main_loop_num in np.arange(0,np.size(pids)):
                                     n_rasters=55,  # How many raster traces to include
                                     ax=ax1,  # Make sure we plot to the axis we created
                                     yticks=False,
-                                    pethline_kwargs={'color': 'blue', 'lw': 1,'linestyle': 'dashed'},
-                                    errbar_kwargs={'color': 'blue', 'alpha': 0.5},
+                                    pethline_kwargs={'color': 'blue', 'lw': 2,'linestyle': 'dashed'},
+                                    errbar_kwargs={'color': 'xkcd:violet', 'alpha': 0.4},
                                     eventline_kwargs={'color': 'black', 'alpha': 0},
                                     raster_kwargs={'color': 'black', 'lw': 0.5},
                                     normalize_to_baseline = normalize_to_baseline)
@@ -603,8 +673,8 @@ for main_loop_num in np.arange(0,np.size(pids)):
                                     n_rasters=55,  # How many raster traces to include
                                     ax=ax1,  # Make sure we plot to the axis we created
                                     yticks=False,
-                                    pethline_kwargs={'color': 'red', 'lw': 2},
-                                    errbar_kwargs={'color': 'red', 'alpha': 0.5},
+                                    pethline_kwargs={'color': 'xkcd:tangerine', 'lw': 2},
+                                    errbar_kwargs={'color': 'xkcd:tangerine', 'alpha': 0.4},
                                     eventline_kwargs={'color': 'black', 'alpha': 0},
                                     raster_kwargs={'color': 'black', 'lw': 0.5},
                                     normalize_to_baseline = normalize_to_baseline)
@@ -621,48 +691,53 @@ for main_loop_num in np.arange(0,np.size(pids)):
                                     n_rasters=55,  # How many raster traces to include
                                     ax=ax1,  # Make sure we plot to the axis we created
                                     yticks=False,
-                                    pethline_kwargs={'color': 'red', 'lw': 1,'linestyle': 'dashed'},
-                                    errbar_kwargs={'color': 'red', 'alpha': 0.5},
-                                    eventline_kwargs={'color': 'black', 'alpha': 0.6},
+                                    pethline_kwargs={'color': 'blue', 'lw': 2,'linestyle': 'dashed'},
+                                    errbar_kwargs={'color': 'xkcd:tangerine', 'alpha': 0.4},
+                                    eventline_kwargs={'color': 'black', 'alpha': 0.4},
                                     raster_kwargs={'color': 'black', 'lw': 0.5},
                                     normalize_to_baseline = normalize_to_baseline)
-        ###plot all nonstim trials
-        ax1, plot_edge, nonstim_all_peth = peri_event_time_histogram(allspikes.times,  # Spike times first
-                                    allspikes.clusters,  # Then cluster ids
-                                    PETH5_onset,
-                                    [j],  # Identity of the cluster we plot
-                                    t_before=t_before, t_after=t_after,  # Time before and after the event
-                                    error_bars='sem',  # Whether we want Stdev, SEM, or no error
-                                    smoothing=smoothing,
-                                    bin_size=bin_size,
-                                    include_raster=False,  # adds a raster to the bottom
-                                    n_rasters=55,  # How many raster traces to include
-                                    ax=ax1,  # Make sure we plot to the axis we created
-                                    yticks=False,
-                                    pethline_kwargs={'color': 'black', 'lw': 2},
-                                    errbar_kwargs={'color': 'black', 'alpha': 0.5},
-                                    eventline_kwargs={'color': 'black', 'alpha': 0.6},
-                                    raster_kwargs={'color': 'black', 'lw': 0.5},
-                                    normalize_to_baseline = normalize_to_baseline)
-        ###plot all stim trials
-        ax1, plot_edge, stim_all_peth = peri_event_time_histogram(allspikes.times,  # Spike times first
-                                    allspikes.clusters,  # Then cluster ids
-                                    PETH6_onset,
-                                    [j],  # Identity of the cluster we plot
-                                    t_before=t_before, t_after=t_after,  # Time before and after the event
-                                    error_bars='sem',  # Whether we want Stdev, SEM, or no error
-                                    smoothing=smoothing,
-                                    bin_size=bin_size,
-                                    include_raster=False,  # adds a raster to the bottom
-                                    n_rasters=55,  # How many raster traces to include
-                                    ax=ax1,  # Make sure we plot to the axis we created
-                                    yticks=False,
-                                    pethline_kwargs={'color': 'green', 'lw': 0.5},
-                                    errbar_kwargs={'color': 'black', 'alpha': 0.2},
-                                    eventline_kwargs={'color': 'black', 'alpha': 0.6},
-                                    raster_kwargs={'color': 'black', 'lw': 0.5},
-                                    normalize_to_baseline = normalize_to_baseline)
+            
+        if only_plot_FR == 0:
+            ###plot all nonstim trials
+            ax1, plot_edge, nonstim_all_peth = peri_event_time_histogram(allspikes.times,  # Spike times first
+                                        allspikes.clusters,  # Then cluster ids
+                                        PETH5_onset,
+                                        [j],  # Identity of the cluster we plot
+                                        t_before=t_before, t_after=t_after,  # Time before and after the event
+                                        error_bars='sem',  # Whether we want Stdev, SEM, or no error
+                                        smoothing=smoothing,
+                                        bin_size=bin_size,
+                                        include_raster=False,  # adds a raster to the bottom
+                                        n_rasters=55,  # How many raster traces to include
+                                        ax=ax1,  # Make sure we plot to the axis we created
+                                        yticks=False,
+                                        pethline_kwargs={'color': 'black', 'lw': 2},
+                                        errbar_kwargs={'color': 'black', 'alpha': 0.5},
+                                        eventline_kwargs={'color': 'black', 'alpha': 0.6},
+                                        raster_kwargs={'color': 'black', 'lw': 0.5},
+                                        normalize_to_baseline = normalize_to_baseline)
+            ###plot all stim trials
+            ax1, plot_edge, stim_all_peth = peri_event_time_histogram(allspikes.times,  # Spike times first
+                                        allspikes.clusters,  # Then cluster ids
+                                        PETH6_onset,
+                                        [j],  # Identity of the cluster we plot
+                                        t_before=t_before, t_after=t_after,  # Time before and after the event
+                                        error_bars='sem',  # Whether we want Stdev, SEM, or no error
+                                        smoothing=smoothing,
+                                        bin_size=bin_size,
+                                        include_raster=False,  # adds a raster to the bottom
+                                        n_rasters=55,  # How many raster traces to include
+                                        ax=ax1,  # Make sure we plot to the axis we created
+                                        yticks=False,
+                                        pethline_kwargs={'color': 'green', 'lw': 0.5},
+                                        errbar_kwargs={'color': 'black', 'alpha': 0.2},
+                                        eventline_kwargs={'color': 'black', 'alpha': 0.6},
+                                        raster_kwargs={'color': 'black', 'lw': 0.5},
+                                        normalize_to_baseline = normalize_to_baseline)
 
+        if plot_each_cluster == 0:
+            plt.close('all')
+        
         nonstim_80_means = nonstim_80_peth.means[0]
         nonstim_20_means = nonstim_20_peth.means[0]
         stim_80_means = stim_80_peth.means[0]
@@ -671,8 +746,9 @@ for main_loop_num in np.arange(0,np.size(pids)):
         nonstim_20_means_err = nonstim_20_peth.stds[0]
         stim_80_means_err = stim_80_peth.stds[0]
         stim_20_means_err = stim_20_peth.stds[0]
-        nonstim_all_means = nonstim_all_peth.means[0]
-        stim_all_means = stim_all_peth.means[0]
+        if only_plot_FR == 0:
+            nonstim_all_means = nonstim_all_peth.means[0]
+            stim_all_means = stim_all_peth.means[0]
 
         # for k in range(np.size(delta_FR_8020_nonstim)):
         #     if stim_80_means[k] - stim_20_means[k] > 0 and delta_FR_8020_nonstim[k] > 0:
@@ -726,31 +802,34 @@ for main_loop_num in np.arange(0,np.size(pids)):
 
         ### normalization for plotting
         ### replace any values that are 0 to prevent infinite values
-        nonstim_all_means[nonstim_all_means==0] = 0.1
-        stim_all_means[stim_all_means==0] = 0.1
-        # delta_FR_8020_nonstim_normalized = delta_FR_8020_nonstim/QP_firing_rate
-        delta_FR_8020_nonstim_normalized = delta_FR_8020_nonstim/nonstim_all_means
-        # delta_FR_8020_stim_normalized = delta_FR_8020_stim/QP_firing_rate
-        delta_FR_8020_stim_normalized = delta_FR_8020_stim/stim_all_means
+        if only_plot_FR == 0:
+            nonstim_all_means[nonstim_all_means==0] = 0.1
+            stim_all_means[stim_all_means==0] = 0.1
+            # delta_FR_8020_nonstim_normalized = delta_FR_8020_nonstim/QP_firing_rate
+            delta_FR_8020_nonstim_normalized = delta_FR_8020_nonstim/nonstim_all_means
+            # delta_FR_8020_stim_normalized = delta_FR_8020_stim/QP_firing_rate
+            delta_FR_8020_stim_normalized = delta_FR_8020_stim/stim_all_means
 
-        mean_delta_FR_8020_nonstim = np.nanmean(delta_FR_8020_nonstim_normalized[first_index_for_mean:last_index_for_mean])
-        mean_delta_FR_8020_stim = np.nanmean(delta_FR_8020_stim_normalized[first_index_for_mean:last_index_for_mean])
-        if np.isnan(mean_delta_FR_8020_nonstim) or np.isnan(mean_delta_FR_8020_stim) or np.nanmean(delta_FR_8020_nonstim_normalized) > 100:
-            ###the last or statement is to remove a few cells with deltaFRs on the order of 10^20? clearly some artifact.
-            print('theres some problem with your MEAN delta FR measurement, skipping...')
-            plt.close('all')
-            continue
+            mean_delta_FR_8020_nonstim = np.nanmean(delta_FR_8020_nonstim_normalized[first_index_for_mean:last_index_for_mean])
+            mean_delta_FR_8020_stim = np.nanmean(delta_FR_8020_stim_normalized[first_index_for_mean:last_index_for_mean])
+            if np.isnan(mean_delta_FR_8020_nonstim) or np.isnan(mean_delta_FR_8020_stim) or np.nanmean(delta_FR_8020_nonstim_normalized) > 100:
+                ###the last or statement is to remove a few cells with deltaFRs on the order of 10^20? clearly some artifact.
+                print('theres some problem with your MEAN delta FR measurement, skipping...')
+                plt.close('all')
+                continue
 
         current_unit_spike_indices = np.where(allspikes.clusters == j)
         current_unit_spike_indices = current_unit_spike_indices[0]
         current_unit_spike_times = allspikes.times[current_unit_spike_indices]
-    
-        #### perform BS analysis using previously created pseudo sessions
-        # BS_score, pval_real, pct50_pseudo = isbiasblockselective_02(current_unit_spike_times, trials, pseudo_20_index_filtered, pseudo_80_index_filtered)
-        #updated BS function is not working correctly; pvalues obviously fucked up.  not sure what is issue...
 
-        BS_score, pval_real, pct95_pseudo, fr_80_trials_nonstim, fr_20_trials_nonstim, fr_80_trials_inhibition, fr_20_trials_inhibition = isbiasblockselective_03(current_unit_spike_times, trials.probabilityLeft, trials.goCue_times, excitation_trials_numbers,inhibition_trials_numbers,nonstim_trials_numbers,
-                        pseudo_20_index_filtered, pseudo_80_index_filtered)
+        #### perform BS analysis using previously created pseudo sessions
+
+        # BS_score, pval_real, pct95_pseudo, fr_80_trials_nonstim, fr_20_trials_nonstim, fr_80_trials_inhibition, fr_20_trials_inhibition = isbiasblockselective_03(current_unit_spike_times, trials.probabilityLeft, trials.goCue_times, excitation_trials_numbers,inhibition_trials_numbers,nonstim_trials_numbers,
+        #                 pseudo_20_index_filtered, pseudo_80_index_filtered)
+        
+        BS_score, p_empirical, pval_real, stat_real, stat_pseudo, fr_80_nonstim, fr_20_nonstim, fr_80_inhib, fr_20_inhib = isbiasblockselective_perm_vector(
+                        current_unit_spike_times, trials.probabilityLeft, trials.goCue_times, inhibition_trials_numbers, nonstim_trials_numbers,
+                        pseudo_20_index_filtered, pseudo_80_index_filtered, trials.quiescencePeriod)
 
         # if exclude_drifty_units == 1:
         #     if pct50_pseudo < 0.05:
@@ -768,9 +847,15 @@ for main_loop_num in np.arange(0,np.size(pids)):
 
         print('Axonal unit score = ' + str(axonal_unit_score))
 
-        print('BS score = ' + str(BS_score) + ', P value real = ' + str(pval_real) + ', 95% pseudo pval = ' + str(pct95_pseudo))
-        print('Mean FR change nonstim = ' + str(mean_delta_FR_8020_nonstim) + ', QP FR = ' + str(QP_firing_rate))
-        print('Mean FR change stim = ' + str(mean_delta_FR_8020_stim))
+        print('BS score = ' + str(BS_score) + ', P value = ' + str(p_empirical))
+        if only_plot_FR == 0:
+            print('Mean FR change nonstim = ' + str(mean_delta_FR_8020_nonstim) + ', QP FR = ' + str(QP_firing_rate))
+            print('Mean FR change stim = ' + str(mean_delta_FR_8020_stim))
+
+        if plot_only_BS_units == 1:
+            if BS_score == 0:
+                plt.close('all')
+                continue
 
         # if analyze_latency == 1:
 
@@ -870,28 +955,33 @@ for main_loop_num in np.arange(0,np.size(pids)):
         #         print('Non-responsive unit! (not skipping yet)')
                 
         current_unit_allen_label = brain_acronyms_percluster[j]
-        current_unit_beryl_label = br.acronym2acronym(current_unit_allen_label, mapping='Beryl')
+        if isinstance(current_unit_allen_label, str) == 0:
+            current_unit_beryl_label = np.nan
+        else:
+            current_unit_beryl_label = br.acronym2acronym(current_unit_allen_label, mapping='Beryl')
 
 
         ### All data gets appended here
-        delta_fr_nonstim_all.append(delta_FR_8020_nonstim_normalized)
-        delta_fr_inhibition_all.append(delta_FR_8020_stim_normalized)
-        zscore_all.append(z_score)
+        if only_plot_FR == 0:
+            delta_fr_nonstim_all.append(delta_FR_8020_nonstim_normalized)
+            delta_fr_inhibition_all.append(delta_FR_8020_stim_normalized)
+            zscore_all.append(z_score)
 
-        clusters_info_DF = pd.concat([clusters_info_DF,pd.DataFrame(
-            index=[clusters_info_DF.shape[0] + 1], data={
-                                'Allenregion': current_unit_allen_label,
-                                'Berylregion': current_unit_beryl_label,
-                                'pid': pid,
-                                'clustnum': j,
-                                'IBL_label':clusters_labels[j],
-                                # 'KS2_label':clusters_ks2labels[j],
-                                'ax_unit': axonal_unit_score,
-                                'pval': pval_real,
-                                'pct95_ps': pct95_pseudo,
-                                'BS_score': BS_score,
-                                'Delta_nonstim': mean_delta_FR_8020_nonstim,
-                                'Delta_stim': mean_delta_FR_8020_stim})])
+            clusters_info_DF = pd.concat([clusters_info_DF,pd.DataFrame(
+                index=[clusters_info_DF.shape[0] + 1], data={
+                                    'Allenregion': str(current_unit_allen_label),
+                                    'Berylregion': str(current_unit_beryl_label),
+                                    'pid': pid,
+                                    'clustnum': j,
+                                    'IBL_label':clusters_labels[j],
+                                    # 'KS2_label':clusters_ks2labels[j],
+                                    'ax_unit': axonal_unit_score,
+                                    'pval_real': pval_real,
+                                    'pval_empirical': p_empirical,
+                                    'BS_score': BS_score,
+                                    'Delta_nonstim': mean_delta_FR_8020_nonstim,
+                                    'Delta_stim': mean_delta_FR_8020_stim})])
+            
 
         # if excitation_traces_percluster == []:
         #     if zscore_normalize == 0:
@@ -912,61 +1002,64 @@ for main_loop_num in np.arange(0,np.size(pids)):
         #     #     excitation_traces_percluster = np.vstack([excitation_traces_percluster, excitation_means_z])
         #     #     inhibition_traces_percluster = np.vstack([inhibition_traces_percluster, inhibition_means_z])
 
-        rand_indices_wav = np.random.choice(wf_idx,15)
-        for k in rand_indices_wav:
-            rand_wf = spike_wfs['waveforms'][k, :, 0]
+        if only_plot_FR == 0:
+            rand_indices_wav = np.random.choice(wf_idx,15)
+            for k in rand_indices_wav:
+                rand_wf = spike_wfs['waveforms'][k, :, 0]
+                if plot_each_cluster == 1:
+                    ax3.plot(rand_wf,'r-',linewidth=0.5)
+
             if plot_each_cluster == 1:
-                ax3.plot(rand_wf,'r-',linewidth=0.5)
+                ax3.plot(wf_avg_chn_max_nonnorm,'k-',linewidth = 3)
+                # ax2.plot(delta_FR_8020_nonstim,'k-',linewidth = 3)
+                # ax2.plot(delta_FR_8020_stim,'r-',linewidth = 3)
+                ax2.axhline(y=0, color='gray', linestyle='--', linewidth=1)
+                ax2.plot(z_score,'b-',linewidth = 3)
 
-        if plot_each_cluster == 1:
-            ax3.plot(wf_avg_chn_max_nonnorm,'k-',linewidth = 3)
-            # ax2.plot(delta_FR_8020_nonstim,'k-',linewidth = 3)
-            # ax2.plot(delta_FR_8020_stim,'r-',linewidth = 3)
-            ax2.axhline(y=0, color='gray', linestyle='--', linewidth=1)
-            ax2.plot(z_score,'b-',linewidth = 3)
+        if plot_edge1 > plot_edge:
+            plot_limit = plot_edge1
+        else:
+            plot_limit = plot_edge
 
-            if plot_edge1 > plot_edge:
-                plot_limit = plot_edge1
-            else:
-                plot_limit = plot_edge
+        if np.isnan(plot_limit) == 1:
+            plot_limit = 1
 
-            if np.isnan(plot_limit) == 1:
-                plot_limit = 1
+        if np.isinf(plot_limit) == 1:
+            plot_limit = 100
 
-            if np.isinf(plot_limit) == 1:
-                plot_limit = 100
+        if plot_limit > 100:
+            ax1.set_yticks(np.arange(0, 200, step=20))
+        if plot_limit < 100 and plot_limit > 20:
+            ax1.set_yticks(np.arange(0, 100, step=5))
+        if plot_limit < 20:
+            ax1.set_yticks(np.arange(0, 20, step=1))
+        ax1.set_ylim([0, plot_limit])
+        ax1.set_xlabel('Time from laser onset (s)', fontsize = 13)
+        ax1.set_ylabel('Firing rate (spikes/s)', fontsize = 13)
 
-            if plot_limit > 100:
-                ax1.set_yticks(np.arange(0, 200, step=20))
-            if plot_limit < 100 and plot_limit > 20:
-                ax1.set_yticks(np.arange(0, 100, step=5))
-            if plot_limit < 20:
-                ax1.set_yticks(np.arange(0, 20, step=1))
-            ax1.set_ylim([0, plot_limit])
-            ax1.set_xlabel('Time from laser onset (s)', fontsize = 13)
-            ax1.set_ylabel('Firing rate (spikes/s)', fontsize = 13)
-            plt.show()
-            plt.waitforbuttonpress
-            plt.close('all')
+        plt.show()
+        plt.waitforbuttonpress
+        plt.close('all')
         # except:
         #     print('Error with cluster (numspikes = ' + str(np.size(current_cluster_spike_indices)) + '). Skipping cluster...')
         #     continue
 
 ################# SAVE
+if only_plot_FR == 0:
+    import pickle
+    clusters_info_DF.to_pickle('~/python/saved_figures/' + condition + '_' + onset_alignment + '_BSdownstream_DF' '.pkl')
 
-import pickle
-clusters_info_DF.to_pickle('~/python/saved_figures/' + condition + '_' + onset_alignment + '_BSdownstream_DF' '.pkl')
+    delta_fr_data = {'delta_fr_nonstim_all': delta_fr_nonstim_all, 'delta_fr_inhibition_all': delta_fr_inhibition_all, 'zscore_all': zscore_all}
+    with open(condition + '_' + onset_alignment + '_delta_fr.pickle', 'wb') as f:
+        pickle.dump(delta_fr_data, f)
 
-delta_fr_data = {'delta_fr_nonstim_all': delta_fr_nonstim_all, 'delta_fr_inhibition_all': delta_fr_inhibition_all, 'zscore_all': zscore_all}
-with open(condition + '_' + onset_alignment + '_delta_fr.pickle', 'wb') as f:
-    pickle.dump(delta_fr_data, f)
-
-print('Pickle dumped!')
+    print('Pickle dumped!')
 
 # #################################################################################################
 # ########### Post Analysis
 
 ################# LOAD
+import pickle
 clusters_info_DF = pd.read_pickle('~/python/saved_figures/' + condition + '_' + onset_alignment + '_BSdownstream_DF' '.pkl')
 
 with open(condition + '_' + onset_alignment + '_delta_fr.pickle', 'rb') as f:
@@ -1007,25 +1100,25 @@ title_str = 'All midbrain units'
 indices_to_use = clusters_info_DF['Allenregion'].isin(['MRN'])
 title_str = 'All MRN units'
 
-###### ALL BS MRN UNITS
-indices_to_use = (clusters_info_DF['Allenregion'].isin(['MRN'])) & (clusters_info_DF['BS_score'] == 1)
-title_str = 'All BS MRN units'
+# ###### ALL BS MRN UNITS
+# indices_to_use = (clusters_info_DF['Allenregion'].isin(['MRN'])) & (clusters_info_DF['BS_score'] == 1)
+# title_str = 'All BS MRN units'
 
-###### ALL BS NON-SC MIDBRAIN UNITS
-indices_to_use = (clusters_info_DF['Allenregion'].isin(['MB','MRN','RN','PPN','PAG','CUN','PRNr'])) & (clusters_info_DF['BS_score'] == 1)
-title_str = 'All BS NON-SC MIDBRAIN UNITS'
+# ###### ALL BS NON-SC MIDBRAIN UNITS
+# indices_to_use = (clusters_info_DF['Allenregion'].isin(['MB','MRN','RN','PPN','PAG','CUN','PRNr'])) & (clusters_info_DF['BS_score'] == 1)
+# title_str = 'All BS NON-SC MIDBRAIN UNITS'
 
 ###### ALL SC UNITS
 indices_to_use = clusters_info_DF['Allenregion'].isin(['SCsg','SCzo','SCop','SCig','SCiw','SCdg'])
 title_str = 'All SC units'
 
-###### ALL IBL 'OK' SC UNITS
-indices_to_use = (clusters_info_DF['Allenregion'].isin(['SCsg','SCzo','SCop','SCig','SCiw','SCdg'])) & (clusters_info_DF['IBL_label'] > 0.6)
-title_str = 'All OK SC units'
+# ###### ALL IBL 'OK' SC UNITS
+# indices_to_use = (clusters_info_DF['Allenregion'].isin(['SCsg','SCzo','SCop','SCig','SCiw','SCdg'])) & (clusters_info_DF['IBL_label'] > 0.6)
+# title_str = 'All OK SC units'
 
-###### ALL BS SC UNITS
-indices_to_use = (clusters_info_DF['Allenregion'].isin(['SCsg','SCzo','SCop','SCig','SCiw','SCdg'])) & (clusters_info_DF['BS_score'] == 1)
-title_str = 'All BS SC units'
+# ###### ALL BS SC UNITS
+# indices_to_use = (clusters_info_DF['Allenregion'].isin(['SCsg','SCzo','SCop','SCig','SCiw','SCdg'])) & (clusters_info_DF['BS_score'] == 1)
+# title_str = 'All BS SC units'
 
 ###### ALL BS MIDBRAIN UNITS
 indices_to_use = clusters_info_DF['Allenregion'].isin(allen_regions_formidbrain) & clusters_info_DF['BS_score'] == 1
@@ -1035,33 +1128,42 @@ title_str = 'All Bias-selective midbrain units'
 indices_to_use = (clusters_info_DF['Allenregion'].isin(allen_regions_formidbrain)) & (clusters_info_DF['IBL_label'] > 0.6)
 title_str = 'All Good midbrain units'
 
-###### ALL IBL GOOD BS MIDBRAIN UNITS
-indices_to_use = (clusters_info_DF['Allenregion'].isin(allen_regions_formidbrain)) & (clusters_info_DF['BS_score'] == 1) & (clusters_info_DF['IBL_label'] == 1.0)
-title_str = 'All Good bias-selective midbrain units'
+# ###### ALL IBL GOOD BS MIDBRAIN UNITS
+# indices_to_use = (clusters_info_DF['Allenregion'].isin(allen_regions_formidbrain)) & (clusters_info_DF['BS_score'] == 1) & (clusters_info_DF['IBL_label'] == 1.0)
+# title_str = 'All Good bias-selective midbrain units'
 
-###### ALL IBL 'OK' BS MIDBRAIN UNITS
-indices_to_use = (clusters_info_DF['Allenregion'].isin(allen_regions_formidbrain)) & (clusters_info_DF['BS_score'] == 1) & (clusters_info_DF['IBL_label'] > 0.6)
-title_str = 'All Good bias-selective midbrain units'
+# ###### ALL IBL 'OK' BS MIDBRAIN UNITS
+# indices_to_use = (clusters_info_DF['Allenregion'].isin(allen_regions_formidbrain)) & (clusters_info_DF['BS_score'] == 1) & (clusters_info_DF['IBL_label'] > 0.6)
+# title_str = 'All Good bias-selective midbrain units'
 
-###### ALL CORTEX UNITS
-indices_to_use = clusters_info_DF['Berylregion'].isin(beryl_regions_forcortex)
-title_str = 'All cortex units'
+# ###### ALL CORTEX UNITS
+# indices_to_use = clusters_info_DF['Berylregion'].isin(beryl_regions_forcortex)
+# title_str = 'All cortex units'
 
-###### ALL AXONAL UNITS
-indices_to_use = clusters_info_DF['ax_unit'] == 1
-title_str = 'All axonal units'
+# ###### ALL AXONAL UNITS
+# indices_to_use = clusters_info_DF['ax_unit'] == 1
+# title_str = 'All axonal units'
 
-###### NO AXONAL UNITS
-indices_to_use = clusters_info_DF['ax_unit'] == 0
-title_str = 'No axonal units'
+# ###### NO AXONAL UNITS
+# indices_to_use = clusters_info_DF['ax_unit'] == 0
+# title_str = 'No axonal units'
 
-###### ALL IPSI UNITS
-indices_to_use = clusters_info_DF['pid'].isin(pids_list_ZI_trained) | clusters_info_DF['pid'].isin(pids_list_SNr_trained)
-title_str = 'All ipsi units'
+# ###### ALL IPSI UNITS
+# indices_to_use = clusters_info_DF['pid'].isin(pids_list_ZI_trained) | clusters_info_DF['pid'].isin(pids_list_SNr_trained)
+# title_str = 'All ipsi units'
 
-###### ALL CONTRA UNITS
-indices_to_use = clusters_info_DF['pid'].isin(pids_list_ZI_trained_contra) | clusters_info_DF['pid'].isin(pids_list_SNr_contra_trained)
-title_str = 'All contra units'
+# ###### ALL CONTRA UNITS
+# indices_to_use = clusters_info_DF['pid'].isin(pids_list_ZI_trained_contra) | clusters_info_DF['pid'].isin(pids_list_SNr_contra_trained)
+# title_str = 'All contra units'
+
+##### Only 1st session for SWC_NM_018
+indices_to_use = clusters_info_DF['pid'].isin(['518b61c2-45bc-40c2-bee1-d87b0d1986ac']) & clusters_info_DF['BS_score'] == 1
+title_str = 'All units'
+
+
+##### Only 2nd session for SWC_NM_018
+indices_to_use = clusters_info_DF['pid'].isin(['e4696ffd-248e-41cb-a62a-16e320b8cd7e']) & clusters_info_DF['BS_score'] == 1
+title_str = 'All units'
 
 
 #################################################################################################
@@ -1070,10 +1172,28 @@ indices_to_use_plt = np.where(indices_to_use == True)[0]
 
 selected_arrays_nonstim = [delta_fr_nonstim_all[i] for i in indices_to_use_plt]
 selected_arrays_stim = [delta_fr_inhibition_all[i] for i in indices_to_use_plt]
-mean_delta_trace_nonstim = np.nanmean(selected_arrays_nonstim, axis=0) * 100
-mean_delta_trace_stim = np.nanmean(selected_arrays_stim, axis=0) * 100
-stderr_mean_delta_trace_nonstim = np.std(selected_arrays_nonstim,axis=0)/np.sqrt(len(selected_arrays_nonstim)) * 100
-stderr_mean_delta_trace_stim = np.std(selected_arrays_stim,axis=0)/np.sqrt(len(selected_arrays_stim)) * 100
+
+abs_selected_arrays_nonstim = [delta_fr_nonstim_all[i] for i in indices_to_use_plt]
+abs_selected_arrays_stim = [delta_fr_inhibition_all[i] for i in indices_to_use_plt]
+
+#####trying to take 'absolute value' of trace here, ie reflecting magnitude difference but not direction
+for i in range(0,len(selected_arrays_stim)):
+    if np.nanmean(selected_arrays_nonstim[i]) < 0:
+        abs_selected_arrays_nonstim[i] = -1*selected_arrays_nonstim[i]
+        abs_selected_arrays_stim[i] = -1*selected_arrays_stim[i]
+    else:
+        abs_selected_arrays_nonstim[i] = selected_arrays_nonstim[i]
+        abs_selected_arrays_stim[i] = selected_arrays_stim[i]
+
+# mean_delta_trace_nonstim = np.nanmean(selected_arrays_nonstim, axis=0) * 100
+# mean_delta_trace_stim = np.nanmean(selected_arrays_stim, axis=0) * 100
+# stderr_mean_delta_trace_nonstim = np.std(selected_arrays_nonstim,axis=0)/np.sqrt(len(selected_arrays_nonstim)) * 100
+# stderr_mean_delta_trace_stim = np.std(selected_arrays_stim,axis=0)/np.sqrt(len(selected_arrays_stim)) * 100
+
+mean_delta_trace_nonstim = np.nanmean(abs_selected_arrays_nonstim, axis=0) * 100
+mean_delta_trace_stim = np.nanmean(abs_selected_arrays_stim, axis=0) * 100
+stderr_mean_delta_trace_nonstim = np.std(abs_selected_arrays_nonstim,axis=0)/np.sqrt(len(abs_selected_arrays_nonstim)) * 100
+stderr_mean_delta_trace_stim = np.std(abs_selected_arrays_stim,axis=0)/np.sqrt(len(abs_selected_arrays_stim)) * 100
 
 plt.plot(x_values_for_plot,mean_delta_trace_nonstim,color='k',linewidth=3,label='Delta FR (%) control')
 plt.plot(x_values_for_plot,mean_delta_trace_stim,color='b',linewidth=3,label='Delta FR (%) Laser')
@@ -1085,7 +1205,7 @@ plt.ylabel('Delta FR 80/20 blocks (% baseline)')
 plt.xlim(-10,20)
 # plt.ylim(-20,100)
 plt.title(title_str + ', n = ' + str(len(selected_arrays_nonstim)))
-plt.legend()
+# plt.legend()
 plt.show()
 
 selected_arrays = [zscore_all[i] for i in indices_to_use_plt]
@@ -1097,11 +1217,11 @@ plt.fill_between(x_values_for_plot, mean_zscore-stderr_mean_zscore, mean_zscore+
 plt.axvline(x=0, linestyle='--', color='red', label=onset_alignment)
 plt.axhline(y=0, color='gray', linestyle='--', linewidth=1)
 plt.xlabel('Time from' + onset_alignment + ' (s)')
-plt.ylabel('Delta FR 80/20 blocks (% baseline)')
+plt.ylabel('Delta FR 80/20 blocks (Z-scored)')
 plt.xlim(-10,20)
 # plt.ylim(-1,0.5)
 plt.title(title_str + ', n = ' + str(len(selected_arrays_nonstim)))
-plt.legend()
+# plt.legend()
 plt.show()
 
 ######################################

@@ -22,6 +22,10 @@ ba = AllenAtlas()
 br = BrainRegions()
 ###currently manually defining which to use
 
+# one = ONE(base_url='https://alyx.internationalbrainlab.org')
+one = ONE(base_url='https://alyx.internationalbrainlab.org', cache_dir=Path.home() / 'Nates_Data/ONE/alyx.internationalbrainlab.org')
+# temporarily uses local cache
+
 def filter_trials(stim_choice, stim_contrast, stim_side):
     if (stim_choice == 'all') & (stim_contrast == 'all') & (stim_side == 'both'):
         trials_id = np.arange(len(trials.choice))
@@ -52,7 +56,7 @@ def filter_trials(stim_choice, stim_contrast, stim_side):
 ### below may be depricated
 def query_sessions_pids_all(selection='resolved-behavior'):
     # from one.api import ONE
-    one = ONE(base_url='https://alyx.internationalbrainlab.org')
+    # one = ONE(base_url='https://alyx.internationalbrainlab.org')
 
     if selection == 'all':
         # Query all ephysChoiceWorld sessions
@@ -104,14 +108,10 @@ def query_sessions_pids_all(selection='resolved-behavior'):
     #     probes.append(all_probes[[s == eid for s in all_eids]])
     return all_pids
 
-one = ONE(base_url='https://alyx.internationalbrainlab.org')
+ins_str_query = 'datasets__tags__name,Brainwidemap'
+aligned_pids = one.alyx.rest('insertions', 'list', django=ins_str_query) ### satisfies behaviour criteria
 
-# ins_str_query = 'datasets__tags__name,Brainwidemap'
-# aligned_pids = one.alyx.rest('insertions', 'list', django=ins_str_query) ### satisfies behaviour criteria
-
-# aligned_pids = query_sessions_pids_all(selection='resolved-behavior')
-# aligned_pids = np.unique(aligned_pids_all, axis=0)
-aligned_pids = one.search_insertions(datasets='spikes.times.npy', project='brainwide')
+# aligned_pids = one.search_insertions(datasets='spikes.times.npy', project='brainwide') ### all BWM sessions, without behaviour criteria
 
 aligned_pids_df = pd.DataFrame(aligned_pids)
 aligned_pids_df.to_pickle('~/python/saved_figures/' + 'aligned_pids_df_all' + '.pkl')
@@ -146,12 +146,12 @@ allunits_FR_block_length_20_lower[:] = np.nan
 allunits_FR_block_length_80_lower = np.empty([1000,30])
 allunits_FR_block_length_80_lower[:] = np.nan
 num_units = 0
-for k in np.arange(0,np.size(aligned_pids)):
+for k in np.arange(178,np.size(aligned_pids)):
 
     try:
         print('\nProcessing session %d of %d' % (k+1, len(aligned_pids)))
 
-        pid = aligned_pids[k]
+        pid = aligned_pids[k]['id'] ### if using one.search, remove ['id']
         ssl = SpikeSortingLoader(pid=pid, one=one, atlas=ba)
         eid = ssl.eid
         trials = one.load_object(eid, 'trials')
@@ -295,149 +295,153 @@ for k in np.arange(0,np.size(aligned_pids)):
         allclusters_array = np.arange(0, np.size(brain_acronyms_percluster))
         max_index = np.size(allclusters_array)
         mean_firing_rates = clusters['firing_rate']
+    except:
+        print('error loading session, skipping...')
+        continue
+    #     ### uncomment from here
 
-        ###generate 1000 pseudo sessions
-        pseudo_20_index_filtered,pseudo_80_index_filtered = generate_pseudo_sessions(trials)
+    #     ###generate 1000 pseudo sessions
+    #     pseudo_20_index_filtered,pseudo_80_index_filtered = generate_pseudo_sessions(trials)
 
-        ### legacy code; remove and simplify at some point
-        isregion = np.ones(np.size(brain_acronyms_percluster))
-        region_indices = np.where(isregion == 1)[0]
+    #     ### legacy code; remove and simplify at some point
+    #     isregion = np.ones(np.size(brain_acronyms_percluster))
+    #     region_indices = np.where(isregion == 1)[0]
 
-        ### calculate FR
-        print('Adding clusters to dataframe')
+    #     ### calculate FR
+    #     print('Calculating bias-selectivity and adding clusters to dataframe')
 
-        for j in region_indices: ### legacy code
-            if j in spikes.clusters and clusters_labels[j] >= cluster_label_threshold and mean_firing_rates[j] > FR_threshold:
-                # print(j)
-                ### calculate FR (400ms:gocue)
-                current_unit_allen_label = brain_acronyms_percluster[j]
-                current_unit_spike_indices = np.where(spikes.clusters == j)
-                current_unit_spike_indices = current_unit_spike_indices[0]
-                current_unit_spike_times = spikes.times[current_unit_spike_indices]
-                fr_per_trial = np.empty((1, np.size(alltrials)))
-                fr_per_trial[:] = np.nan
-                fr_per_trial = fr_per_trial[0]
-                isbiasselective, p_empirical, pval_real, stat_real, stat_pseudo, fr_80_trials_nonstim, fr_20_trials_nonstim, [], [] = isbiasblockselective_perm_vector(
-                        current_unit_spike_times, trials.probabilityLeft, trials.goCue_times,
-                        [], range(0,len(trials.probabilityLeft)-1),
-                        pseudo_20_index_filtered, pseudo_80_index_filtered,
-                        trials.quiescencePeriod,
-                        blocklength_filterval = 10, before_gocue_end_time = 0.01, 
-                        alpha = 0.05)
+    #     for j in region_indices: ### legacy code
+    #         if j in spikes.clusters and clusters_labels[j] >= cluster_label_threshold and mean_firing_rates[j] > FR_threshold:
+    #             # print(j)
+    #             ### calculate FR (400ms:gocue)
+    #             current_unit_allen_label = brain_acronyms_percluster[j]
+    #             current_unit_spike_indices = np.where(spikes.clusters == j)
+    #             current_unit_spike_indices = current_unit_spike_indices[0]
+    #             current_unit_spike_times = spikes.times[current_unit_spike_indices]
+    #             fr_per_trial = np.empty((1, np.size(alltrials)))
+    #             fr_per_trial[:] = np.nan
+    #             fr_per_trial = fr_per_trial[0]
+    #             isbiasselective, p_empirical, pval_real, stat_real, stat_pseudo, fr_80_trials_nonstim, fr_20_trials_nonstim, [], [] = isbiasblockselective_perm_vector(
+    #                     current_unit_spike_times, trials.probabilityLeft, trials.goCue_times,
+    #                     [], range(0,len(trials.probabilityLeft)-1),
+    #                     pseudo_20_index_filtered, pseudo_80_index_filtered,
+    #                     trials.quiescencePeriod,
+    #                     blocklength_filterval = 10, before_gocue_end_time = 0.01, 
+    #                     alpha = 0.05)
 
-                # for k in np.arange(0,np.size(trials.goCue_times)):
-                #     current_trial_start_time = trials.goCue_times[k] - 0.4
-                #     current_trial_end_time = trials.goCue_times[k] - 0.05
-                #     numspikes_current_trial = np.where(np.logical_and(current_unit_spike_times>current_trial_start_time, current_unit_spike_times<current_trial_end_time))
-                #     numspikes_current_trial = numspikes_current_trial[0]
-                #     numspikes_current_trial = np.size(numspikes_current_trial)
-                #     fr_per_trial[k] = numspikes_current_trial/0.35
+    #             # for k in np.arange(0,np.size(trials.goCue_times)):
+    #             #     current_trial_start_time = trials.goCue_times[k] - 0.4
+    #             #     current_trial_end_time = trials.goCue_times[k] - 0.05
+    #             #     numspikes_current_trial = np.where(np.logical_and(current_unit_spike_times>current_trial_start_time, current_unit_spike_times<current_trial_end_time))
+    #             #     numspikes_current_trial = numspikes_current_trial[0]
+    #             #     numspikes_current_trial = np.size(numspikes_current_trial)
+    #             #     fr_per_trial[k] = numspikes_current_trial/0.35
                     
-                # #     ###calculate block trial # dependent firing
-                # #     if k+1 < 91:
-                # #         current_block_length = current_block_length + 1
-                # #         ###5050 block here
-                # #         continue
-                # #     if k+1 = 91:
-                # #         if np.isin(k+1,alltrialcounts_80_index):
-                # #             current_block_ID = 80
-                # #             current_block_length = 1
-                # #         else:
-                # #             current_block_ID = 20
-                # #             current_block_length = 1
+    #             # #     ###calculate block trial # dependent firing
+    #             # #     if k+1 < 91:
+    #             # #         current_block_length = current_block_length + 1
+    #             # #         ###5050 block here
+    #             # #         continue
+    #             # #     if k+1 = 91:
+    #             # #         if np.isin(k+1,alltrialcounts_80_index):
+    #             # #             current_block_ID = 80
+    #             # #             current_block_length = 1
+    #             # #         else:
+    #             # #             current_block_ID = 20
+    #             # #             current_block_length = 1
 
-                # fr_80_trials = fr_per_trial[alltrialcounts_80_index_filtered]
-                # fr_20_trials = fr_per_trial[alltrialcounts_20_index_filtered]
+    #             # fr_80_trials = fr_per_trial[alltrialcounts_80_index_filtered]
+    #             # fr_20_trials = fr_per_trial[alltrialcounts_20_index_filtered]
 
-                # FR_block_length_80 = np.empty(30,)
-                # FR_block_length_80[:] = np.nan
-                # FR_block_length_20 = np.empty(30,)
-                # FR_block_length_20[:] = np.nan
-                # for k in np.arange(0,30):
-                #     trials_where_length = np.where(alltrialcounts_80==k+1)[1]
-                #     FR_block_length_80[k] = np.nanmean(fr_per_trial[trials_where_length])
-                #     trials_where_length = np.where(alltrialcounts_20==k+1)[1]
-                #     FR_block_length_20[k] = np.nanmean(fr_per_trial[trials_where_length])
+    #             # FR_block_length_80 = np.empty(30,)
+    #             # FR_block_length_80[:] = np.nan
+    #             # FR_block_length_20 = np.empty(30,)
+    #             # FR_block_length_20[:] = np.nan
+    #             # for k in np.arange(0,30):
+    #             #     trials_where_length = np.where(alltrialcounts_80==k+1)[1]
+    #             #     FR_block_length_80[k] = np.nanmean(fr_per_trial[trials_where_length])
+    #             #     trials_where_length = np.where(alltrialcounts_20==k+1)[1]
+    #             #     FR_block_length_20[k] = np.nanmean(fr_per_trial[trials_where_length])
 
-                # norm_FR_block_length_80 = FR_block_length_80/np.nanmean(fr_per_trial)
-                # norm_FR_block_length_20 = FR_block_length_20/np.nanmean(fr_per_trial)
+    #             # norm_FR_block_length_80 = FR_block_length_80/np.nanmean(fr_per_trial)
+    #             # norm_FR_block_length_20 = FR_block_length_20/np.nanmean(fr_per_trial)
 
-                # t, pval_real = stats.ttest_ind(fr_80_trials, fr_20_trials, equal_var=False)
+    #             # t, pval_real = stats.ttest_ind(fr_80_trials, fr_20_trials, equal_var=False)
 
-                # # print('Performing pseudo-block analysis')
-                # pseudo_pvals = np.empty(num_pseudo_blocks)
-                # pseudo_pvals[:] = np.nan
-                # for k in range(num_pseudo_blocks):     
-                #     fr_80_trials_pseudo = fr_per_trial[pseudo_80_index_filtered[k]]
-                #     fr_20_trials_pseudo = fr_per_trial[pseudo_20_index_filtered[k]]
-                #     t, pval_pseudo = stats.ttest_ind(fr_80_trials_pseudo, fr_20_trials_pseudo, equal_var=False)
-                #     pseudo_pvals[k] = pval_pseudo
+    #             # # print('Performing pseudo-block analysis')
+    #             # pseudo_pvals = np.empty(num_pseudo_blocks)
+    #             # pseudo_pvals[:] = np.nan
+    #             # for k in range(num_pseudo_blocks):     
+    #             #     fr_80_trials_pseudo = fr_per_trial[pseudo_80_index_filtered[k]]
+    #             #     fr_20_trials_pseudo = fr_per_trial[pseudo_20_index_filtered[k]]
+    #             #     t, pval_pseudo = stats.ttest_ind(fr_80_trials_pseudo, fr_20_trials_pseudo, equal_var=False)
+    #             #     pseudo_pvals[k] = pval_pseudo
 
-                # pct50_pseudo = np.percentile(pseudo_pvals,50)
-                # pct95_pseudo = np.percentile(pseudo_pvals,5)
-                # pct99_pseudo = np.percentile(pseudo_pvals,1)
-                # pct999_pseudo = np.percentile(pseudo_pvals,0.1)
-                # #how significance assessed
+    #             # pct50_pseudo = np.percentile(pseudo_pvals,50)
+    #             # pct95_pseudo = np.percentile(pseudo_pvals,5)
+    #             # pct99_pseudo = np.percentile(pseudo_pvals,1)
+    #             # pct999_pseudo = np.percentile(pseudo_pvals,0.1)
+    #             # #how significance assessed
 
-                # if pval_real < pct999_pseudo:
-                #     isbiasselective999 = 1
-                #     isbiasselective99 = 1
-                #     isbiasselective95 = 1
+    #             # if pval_real < pct999_pseudo:
+    #             #     isbiasselective999 = 1
+    #             #     isbiasselective99 = 1
+    #             #     isbiasselective95 = 1
 
-                # elif pval_real < pct99_pseudo:
-                #     isbiasselective999 = 0
-                #     isbiasselective99 = 1
-                #     isbiasselective95 = 1
+    #             # elif pval_real < pct99_pseudo:
+    #             #     isbiasselective999 = 0
+    #             #     isbiasselective99 = 1
+    #             #     isbiasselective95 = 1
 
-                # elif pval_real < pct95_pseudo:
-                #     isbiasselective999 = 0
-                #     isbiasselective99 = 0
-                #     isbiasselective95 = 1
+    #             # elif pval_real < pct95_pseudo:
+    #             #     isbiasselective999 = 0
+    #             #     isbiasselective99 = 0
+    #             #     isbiasselective95 = 1
 
-                # else:
-                #     isbiasselective999 = 0
-                #     isbiasselective99 = 0
-                #     isbiasselective95 = 0
+    #             # else:
+    #             #     isbiasselective999 = 0
+    #             #     isbiasselective99 = 0
+    #             #     isbiasselective95 = 0
 
-                # ### new definition BS unit: pval_real < 0.05 (or 0.01) AND pval_real < 50th percentile of pseudo blocks
-                # if pval_real < 0.01 and pval_real < pct50_pseudo:
-                #     isbiasselective01_new = 1
-                #     isbiasselective05_new = 1
-                # elif pval_real < 0.05 and pval_real < pct50_pseudo:
-                #     isbiasselective01_new = 0
-                #     isbiasselective05_new = 1
-                # else:
-                #     isbiasselective01_new = 0
-                #     isbiasselective05_new = 0
+    #             # ### new definition BS unit: pval_real < 0.05 (or 0.01) AND pval_real < 50th percentile of pseudo blocks
+    #             # if pval_real < 0.01 and pval_real < pct50_pseudo:
+    #             #     isbiasselective01_new = 1
+    #             #     isbiasselective05_new = 1
+    #             # elif pval_real < 0.05 and pval_real < pct50_pseudo:
+    #             #     isbiasselective01_new = 0
+    #             #     isbiasselective05_new = 1
+    #             # else:
+    #             #     isbiasselective01_new = 0
+    #             #     isbiasselective05_new = 0
 
-                current_unit_beryl_label = br.acronym2acronym(current_unit_allen_label, mapping='Beryl')
+    #             current_unit_beryl_label = br.acronym2acronym(current_unit_allen_label, mapping='Beryl')
 
-                x_coord = clusters['x'][j] ###save x/y/z coordinates of bs ZI clusters
-                y_coord = clusters['y'][j]
-                z_coord = clusters['z'][j]
-                region_clusters_info = pd.concat([region_clusters_info,pd.DataFrame(
-                    index=[region_clusters_info.shape[0] + 1], data={
-                                        'Allenregion': current_unit_allen_label,
-                                        'Berylregion': current_unit_beryl_label,
-                                        'pid': pid,
-                                        'z': z_coord,
-                                        'y': y_coord,
-                                        'x': x_coord,
-                                        'IBLlabel': clusters_labels[j],
-                                        'clustnum': j,
-                                        'pval': p_empirical,
-                                        # 'pct95_ps': pct95_pseudo,
-                                        'bs': isbiasselective})])
-                #save dataframe
-                # region_clusters_info.to_pickle('~/Documents/python/saved_figures/' + 'bs_analysis_allregions_dataframe_V5' + '.pkl')
-                region_clusters_info.to_csv('~/python/saved_figures/' + 'bs_analysis_allregions_dataframe_newanalysis.csv', index=False)
+    #             x_coord = clusters['x'][j] ###save x/y/z coordinates of bs ZI clusters
+    #             y_coord = clusters['y'][j]
+    #             z_coord = clusters['z'][j]
+    #             region_clusters_info = pd.concat([region_clusters_info,pd.DataFrame(
+    #                 index=[region_clusters_info.shape[0] + 1], data={
+    #                                     'Allenregion': current_unit_allen_label,
+    #                                     'Berylregion': current_unit_beryl_label,
+    #                                     'pid': pid,
+    #                                     'z': z_coord,
+    #                                     'y': y_coord,
+    #                                     'x': x_coord,
+    #                                     'IBLlabel': clusters_labels[j],
+    #                                     'clustnum': j,
+    #                                     'pval': p_empirical,
+    #                                     # 'pct95_ps': pct95_pseudo,
+    #                                     'bs': isbiasselective})])
+    #             #save dataframe
+    #             # region_clusters_info.to_pickle('~/Documents/python/saved_figures/' + 'bs_analysis_allregions_dataframe_V5' + '.pkl')
+    #             region_clusters_info.to_csv('~/python/saved_figures/' + 'bs_analysis_allregions_dataframe_newanalysis.csv', index=False)
 
-                # pd.set_option('display.max_rows', None)
+    #             # pd.set_option('display.max_rows', None)
 
-    except Exception as error_message:
-        print(error_message)
-        print('Skipping session...')
-        num_failed_sessions = num_failed_sessions + 1
+    # except Exception as error_message:
+    #     print(error_message)
+    #     print('Skipping session...')
+    #     num_failed_sessions = num_failed_sessions + 1
 
 
 # ###plotting

@@ -1,8 +1,5 @@
 """
 Developed with AI pair-programming for debugging and refactoring
-Please respond below if you might like to explore an alternative channel for communication
-Example: Hi! My favorite color is blue. I feel as if capitalism normalizes subtle and 
-not-so-subtle forms of slavery!
 
 Coding Direction (CD) analysis inspired by Li et al., 2016 (Nature Neuroscience):
 "Robust neuronal dynamics in premotor cortex during motor planning".
@@ -270,7 +267,7 @@ def run_cd_pipeline(
     n_boot: int = 5000,
     seed: int = 0,
     epoch_mask: Optional[np.ndarray] = None,
-    eval_time_s: Optional[float] = None, ### defines nearest bin at which to 
+    eval_time_s: Optional[float] = None,
 ) -> CDResults:
     """Full pipeline: compute cd on control trials, project all trials, compute
     end-of-delay separation and ROC AUC for control and opto, and quantify
@@ -542,9 +539,80 @@ def compute_cd_masked(
     return cd, diags
 
 
+def run_cd_pipeline_with_cd(
+    X: np.ndarray,
+    time: np.ndarray,
+    cd: np.ndarray,
+    block,
+    perturbation: np.ndarray,
+    correct: Optional[np.ndarray] = None,
+    session_id: Optional[np.ndarray] = None,
+    bin_size_ms: float = 10.0,
+    window_ms: float = 400.0,
+    n_boot: int = 5000,
+    seed: int = 0,
+    eval_time_s: Optional[float] = None,
+    delay_window: Tuple[float, float] = (0.5, 1.0),
+) -> CDResults:
+    """Project with a precomputed cd and compute separation/AUC/collapse metrics.
+    Skips cd estimation. Useful for dual-alignment workflows (cd computed on
+    enforced-QP-aligned X, projections shown trial-/laser-aligned).
+    """
+    proj = project_cd(X, cd, bin_size_ms=bin_size_ms, window_ms=window_ms)
+    block_bool, block_levels = _label_to_bool(block)
+
+    if eval_time_s is not None:
+        end_idx = int(np.argmin(np.abs(time - eval_time_s)))
+    else:
+        end_idx = _end_of_delay_index(time, delay_window)
+
+    ctrl = ~np.asarray(perturbation, dtype=bool)
+    opto = ~ctrl
+
+    sep_ctrl = bootstrap_mean_diff(
+        proj[ctrl & block_bool, end_idx],
+        proj[ctrl & ~block_bool, end_idx], n_boot=n_boot, seed=seed
+    )
+    sep_opto = bootstrap_mean_diff(
+        proj[opto & block_bool, end_idx],
+        proj[opto & ~block_bool, end_idx], n_boot=n_boot, seed=seed
+    )
+
+    delta_obs = sep_ctrl['obs'] - sep_opto['obs']
+    rng = np.random.default_rng(seed)
+    diffs = np.empty(n_boot)
+    a_ctrl = proj[ctrl & block_bool, end_idx]
+    b_ctrl = proj[ctrl & ~block_bool, end_idx]
+    a_opto = proj[opto & block_bool, end_idx]
+    b_opto = proj[opto & ~block_bool, end_idx]
+    for i in range(n_boot):
+        aa_c = rng.choice(a_ctrl, size=a_ctrl.size, replace=True)
+        bb_c = rng.choice(b_ctrl, size=b_ctrl.size, replace=True)
+        aa_o = rng.choice(a_opto, size=a_opto.size, replace=True)
+        bb_o = rng.choice(b_opto, size=b_opto.size, replace=True)
+        diffs[i] = (np.nanmean(aa_c) - np.nanmean(bb_c)) - (np.nanmean(aa_o) - np.nanmean(bb_o))
+    lo_d, hi_d = np.percentile(diffs, [2.5, 97.5])
+    p_delta = 2 * min(np.mean(diffs >= 0), np.mean(diffs <= 0))
+
+    auc_ctrl = roc_at_time(proj[ctrl], block_bool[ctrl], end_idx)
+    auc_opto = roc_at_time(proj[opto], block_bool[opto], end_idx)
+
+    diags = {'cd_source': 'precomputed', 'cd_norm': float(np.linalg.norm(cd))}
+    metrics = {
+        'sep_control': sep_ctrl,
+        'sep_opto': sep_opto,
+        'collapse_delta': {'obs': float(delta_obs), 'ci95': (float(lo_d), float(hi_d)), 'p_two_sided': float(p_delta)},
+        'auc_control_end_delay': float(auc_ctrl),
+        'auc_opto_end_delay': float(auc_opto),
+        'end_of_delay_time_s': float(time[end_idx]),
+    }
+
+    return CDResults(cd, proj, time, block_bool, tuple(block_levels), np.asarray(perturbation, bool), session_id, end_idx, diags, metrics)
+
+
 # ------------------------------ Plotting ------------------------------------
 
-def plot_trajectories(results: CDResults, smooth_ms: Optional[float] = None, title: Optional[str] = None):
+def plot_trajectories(results: CDResults, save_figures, figure_save_path, figure_prefix, smooth_ms: Optional[float] = None, title: Optional[str] = None):
     """Plot mean ± SEM trajectories for control vs opto and block==False/True.
     Uses default matplotlib colors; no explicit color choices.
     """
@@ -578,7 +646,12 @@ def plot_trajectories(results: CDResults, smooth_ms: Optional[float] = None, tit
         plt.title(title)
     plt.legend()
     plt.tight_layout()
-    plt.show()
+    if save_figures == 1:
+        plt.savefig(figure_save_path + figure_prefix + '_psych.png')  # Change the path as needed
+        plt.close()
+    else:
+        plt.show()
+
 
 
 # ----------------------------- Actual Usage --------------------------------
@@ -589,13 +662,15 @@ from brainbox.io.one import SpikeSortingLoader, load_lfp
 from iblatlas.atlas import AllenAtlas, BrainRegions
 from scipy import stats
 import statistics
+from pathlib import Path
 
 import sys
 sys.path.append('/Users/natemiska/python/bias_coding')
-from functions_optostim import signed_contrast, peri_event_time_histogram, generate_pseudo_sessions, isbiasblockselective_03
+from functions_optostim import isbiasblockselective_03, generate_pseudo_sessions
 from metadata_optostim import light_artifact_units_SNr,light_artifact_units_SNr_contra,pids_list_SNr,pids_list_SNr_contra,inhibition_trials_range_list_SNr,inhibition_trials_range_list_SNr_contra,pids_list_SNr_trained,pids_list_SNr_contra_trained,excitation_trials_range_list_SNr_trained,inhibition_trials_range_list_SNr_trained,excitation_trials_range_list_SNr_contra_trained,inhibition_trials_range_list_SNr_contra_trained,light_artifact_units_SNr_trained,light_artifact_units_SNr_contra_trained,pids_list_ZI_trained,pids_list_ZI_trained_contra,excitation_trials_range_list_ZI_trained,inhibition_trials_range_list_ZI_trained,excitation_trials_range_list_ZI_trained_contra,inhibition_trials_range_list_ZI_trained_contra,light_artifact_units_ZI_trained,light_artifact_units_ZI_trained_contra, pids_list_SNr_reverse, excitation_trials_range_list_SNr_reverse, inhibition_trials_range_list_SNr_reverse, light_artifact_units_SNr_reverse
 
-one = ONE(base_url='https://alyx.internationalbrainlab.org')
+one = ONE(base_url='https://alyx.internationalbrainlab.org', cache_dir=Path.home() / '/Users/natemiska/Downloads/ONE/alyx.internationalbrainlab.org')
+# one = ONE(base_url='https://alyx.internationalbrainlab.org')
 # one=ONE(mode='remote')
 
 ba = AllenAtlas()
@@ -603,7 +678,7 @@ br = BrainRegions()
 
 #####################################################################################
 
-condition = 'SNr_ipsi'#'SNr_forBSanalysis'#'SNr_reverse'#'ZI_forBSanalysis'#'SNr_forBSanalysis' #'SNr_directstim'#'ZI_directstim'#'ZI_contra'#'SNr_ipsi' #'SNr_contra' #'ZI_ipsi'
+condition = 'SNr_forBSanalysis'#'SNr_forBSanalysis'#'SNr_reverse'#'ZI_forBSanalysis'#'SNr_forBSanalysis' #'SNr_directstim'#'ZI_directstim'#'ZI_contra'#'SNr_ipsi' #'SNr_contra' #'ZI_ipsi'
 
 onset_alignment = 'Laser onset' #'Laser onset' #'Go cue onset'
 
@@ -614,6 +689,11 @@ bin_size=0.05
 IBL_quality_label_threshold = 0.6
 
 firing_rate_threshold = 1
+
+only_include_BS_units = 0
+
+save_figures = 1
+figures_path = '/Users/natemiska/Desktop/for_sonja_102825'
 
 
 #####################################################################################
@@ -645,12 +725,12 @@ elif condition == 'SNr_contra':
     inhibition_trials_range_list = inhibition_trials_range_list_SNr_contra
     light_artifact_units_list = light_artifact_units_SNr_contra
 
-# ### for incorporating previously calculated BS information
-# import pickle
-# clusters_info_DF = pd.read_pickle('~/python/saved_figures/' + condition + '_' + onset_alignment + '_BSdownstream_DF' '.pkl')
+### for incorporating previously calculated BS information
+import pickle
+clusters_info_DF = pd.read_pickle('~/python/saved_figures/' + condition + '_' + onset_alignment + '_BSdownstream_DF' '.pkl')
 
-# with open(condition + '_' + onset_alignment + '_delta_fr.pickle', 'rb') as f:
-#     data = pickle.load(f)
+with open(condition + '_' + onset_alignment + '_delta_fr.pickle', 'rb') as f:
+    data = pickle.load(f)
 
 #####################################################################################
 
@@ -672,30 +752,41 @@ if __name__ == "__main__":
         spikes, clusters, channels = ssl.load_spike_sorting(enforce_version=False)
         clusters = ssl.merge_clusters(spikes, clusters, channels)
         clusters_labels = clusters['label']
+        # clusters_regions = clusters['acronym']
         allspikes = spikes
 
         #### remove low quality and light artifact clusters
         light_artifact_unit_IDs = light_artifact_units_list[main_loop_num]
         thresholded_cluster_IDs = np.where(clusters_labels > IBL_quality_label_threshold)[0]
         thresholded_cluster_IDs = np.setdiff1d(thresholded_cluster_IDs, light_artifact_unit_IDs)
-
         n_clusters = len(thresholded_cluster_IDs)
 
-        ### relative times corresponding to each data point to plot
-        time = np.arange(-t_before, t_after, bin_size)  # e.g., from -2.5 s to +5 s
-        n_time = time.size
+        ### time will be obtained from build_binned_X for each alignment; no manual grid here
+        # (kept for clarity—removed explicit np.arange to avoid float rounding issues around 0 s)
+        pass
+
+        if inhibition_trials_range == 'ALL':
+            inhibition_trials_range = range(0,len(trials['contrastLeft']))
 
         #### block IDs only for inhibition trials range in 80/20 blocks
         block_IDs = (trials.probabilityLeft[inhibition_trials_range] > 0.5).astype(int)
 
-        #### loads laser intervals data (currently only works for older taskData format)
-        # try:
-        #     laser_intervals = one.load_dataset(eid, '_ibl_laserStimulation.intervals')
-        #     print('finish coding laser intervals format for newer data!')
-        # except:
-        #     print('Laser intervals data not found; loading depricated taskData')
+        #### loads laser intervals data
         try:
+            laser_intervals = one.load_dataset(eid, '_ibl_laserStimulation.intervals')
+            inhibition_trials_numbers = np.empty(max(inhibition_trials_range)+1)
+            inhibition_trials_numbers[:] = np.nan
+            nonstim_trials_numbers = np.empty(max(inhibition_trials_range)+1)
+            nonstim_trials_numbers[:] = np.nan
+            for k in inhibition_trials_range: 
+                if trials.intervals[k,0] in laser_intervals[:,0]:
+                    inhibition_trials_numbers[k] = k
+                else:
+                    nonstim_trials_numbers[k] = k
+        except:
+            print('Laser intervals data not found; loading depricated taskData')
             taskData = load_data(ses_path)
+            
             inhibition_trials_numbers = np.empty(len(taskData))
             inhibition_trials_numbers[:] = np.nan
             nonstim_trials_numbers = np.empty(len(taskData))
@@ -706,89 +797,115 @@ if __name__ == "__main__":
                 else:
                     nonstim_trials_numbers[k] = k
 
-            inhibition_trials_numbers = inhibition_trials_numbers[np.isnan(inhibition_trials_numbers) == 0]
-            nonstim_trials_numbers = nonstim_trials_numbers[np.isnan(nonstim_trials_numbers) == 0]
-            n_trials = len(inhibition_trials_range)
+        inhibition_trials_numbers = inhibition_trials_numbers[np.isnan(inhibition_trials_numbers) == 0]
+        nonstim_trials_numbers = nonstim_trials_numbers[np.isnan(nonstim_trials_numbers) == 0]
+        excitation_trials_numbers = np.empty(0)
+        n_trials = len(inhibition_trials_range)
 
-            #### creates boolean array to represent stim/nonstim trials in inhibition range
-            perturbation = np.isin(inhibition_trials_range, inhibition_trials_numbers)
+        #### Bias selectivity analysis
+        BS_scores = np.zeros(len(clusters_labels))
+        pseudo_20_index_filtered,pseudo_80_index_filtered = generate_pseudo_sessions(trials)
 
-            #### creates boolean array to represent correct/incorrect trials in inhibition range
-            correct = (trials.feedbackType[inhibition_trials_range] > 0)
+        if only_include_BS_units == 1:
+            print('Performing bias selectivity analysis for each cluster...')
+            for cluster_num in thresholded_cluster_IDs:
+                current_unit_spike_indices = np.where(allspikes.clusters == cluster_num)
+                current_unit_spike_indices = current_unit_spike_indices[0]
+                current_unit_spike_times = allspikes.times[current_unit_spike_indices]
 
-            #### Quiescent period currently fixed at 400ms - should be changed for each trial
-            sample_window = (0.0, 0.4)
-            delay_window  = (0.0, 0.4)
+                BS_score, pval_real, pct95_pseudo, fr_80_trials_nonstim, fr_20_trials_nonstim, fr_80_trials_inhibition, fr_20_trials_inhibition = isbiasblockselective_03(current_unit_spike_times, trials.probabilityLeft, trials.goCue_times, excitation_trials_numbers,inhibition_trials_numbers,nonstim_trials_numbers,
+                            pseudo_20_index_filtered, pseudo_80_index_filtered)
+                BS_scores[cluster_num] = BS_score
 
-            #### define rng
-            rng = np.random.default_rng(0)
+            old_thresholded_cluster_IDs = thresholded_cluster_IDs
+            thresholded_cluster_IDs = np.where(BS_scores == 1)[0]
+            n_clusters = len(thresholded_cluster_IDs)
 
-            #### 1) define quiescent start/end and trial start (absolute)
-            goCue_abs      = trials['goCue_times'][inhibition_trials_range]
-            enforced_qp_len        = trials['quiescencePeriod'][inhibition_trials_range]
-            enforced_qp_start_abs = goCue_abs - enforced_qp_len
-            enforced_qp_end_abs   = goCue_abs
-            trial_start_abs = trials['intervals'][inhibition_trials_range][:,0]
+        #### creates boolean array to represent stim/nonstim trials in inhibition range
+        perturbation = np.isin(inhibition_trials_range, inhibition_trials_numbers)
 
-            #### 2) align X to **trial start / laser onset**
-            if onset_alignment == 'Laser onset':
-                align_times = trial_start_abs
-                X, time, unit_ids = build_binned_X(
-                    allspikes['times'], allspikes['clusters'],
-                    thresholded_cluster_IDs, align_times,
-                    t_before, t_after, bin_size, as_rate=False
-                )
-            else:
-                print('Pipeline not yet setup for onset alignment outside of Laser/Trial start!')
+        #### creates boolean array to represent correct/incorrect trials in inhibition range
+        correct = (trials.feedbackType[inhibition_trials_range] > 0)
 
-            #### create epoch_mask, ie defines relative times to use for computing cd
-            goCue_rel = goCue_abs - align_times
-            enforced_qp_start_rel = enforced_qp_start_abs - align_times          # QP start time relative to onset alignment
-            enforced_qp_end_rel   = enforced_qp_end_abs - align_times            # QP end time relative to onset alignment
+        #### Quiescent period currently fixed at 400ms - should be changed for each trial
+        sample_window = (0.0, 0.4)
+        delay_window  = (0.0, 0.4)
 
-            #### There is a potential issue here, which is that the enforced quiescent period time may sit outside the mask
-            epoch_mask  = make_interval_mask(time, enforced_qp_start_rel, enforced_qp_end_rel)
-            # epoch_mask  = make_interval_mask(time, qp_enforced_start_rel, qp_enforced_end_rel)
+        #### define rng
+        rng = np.random.default_rng(0)
 
-            # ### sanity check
-            # # 0 s must be inside the mask for (almost) all trials
-            # zero_idx = int(np.argmin(np.abs(time - 0.0)))
-            # print("mask@0s (fraction True):", np.mean(epoch_mask[:, zero_idx]))
-            
-            # # mask starts near 0 and ends near qp_i
-            # starts = time[np.argmax(epoch_mask, axis=1)]
-            # ends   = time[epoch_mask.argmax(1) + epoch_mask.sum(1) - 1]
-            # print("start (median, IQR):", np.nanmedian(starts), np.nanpercentile(starts, [25, 75]))
-            # print("end   (median, IQR):", np.nanmedian(ends),   np.nanpercentile(ends,   [25, 75]))
-            # ###
+        #### 1) define quiescent start/end and trial start (absolute)
+        goCue_abs      = trials['goCue_times'][inhibition_trials_range]
+        enforced_qp_len        = trials['quiescencePeriod'][inhibition_trials_range]
+        enforced_qp_start_abs = goCue_abs - enforced_qp_len
+        enforced_qp_end_abs   = goCue_abs
+        trial_start_abs = trials['intervals'][inhibition_trials_range][:,0]
 
-            #### run pipeline
-            res = run_cd_pipeline(
-                X, time, block_IDs, perturbation, correct=correct,
-                epoch_mask=epoch_mask,
-                bin_size_ms=bin_size*1000.0, window_ms=200.0,
-                n_boot=2000, seed=1,
-                eval_time_s=0.0,                       # onset
-                # or: eval_time_s=float(np.nanmedian(q_end_rel))  # go cue
-            )
+        #### 2) Build X for cd (aligned to enforced QP start) and for plotting (aligned to trial/laser onset)
+        # --- CD alignment (Option B) ---
+        t_before_cd = 0.05
+        t_after_cd  = 0.75 
+        align_times_cd = enforced_qp_start_abs
+        X_cd, time_cd, _ = build_binned_X(
+            allspikes['times'], allspikes['clusters'],
+            thresholded_cluster_IDs, align_times_cd,
+            t_before_cd, t_after_cd, bin_size, as_rate=False
+        )
+        # mask [0, enforced_qp_len_i)
+        epoch_mask_cd = make_interval_mask(time_cd, np.zeros_like(enforced_qp_len), enforced_qp_len)
+
+        ### sanity check
+        zero_idx = int(np.argmin(np.abs(time_cd - 0.0)))
+        print("cd-mask@0s fraction:", np.mean(epoch_mask_cd[:, zero_idx]))
+        print("cd-window end median (s):", np.nanmedian(enforced_qp_len))
+
+        # Compute cd from control trials during enforced QP
+        cd, diags_cd = compute_cd_masked(
+            X_cd, time_cd, block_IDs, perturbation, epoch_mask_cd, correct=correct,
+            bin_size_ms=bin_size*1000.0, window_ms=200.0,
+        )
+
+        # --- Plot/projection alignment (trial/laser onset) ---
+        align_times = trial_start_abs
+        X, time, unit_ids = build_binned_X(
+            allspikes['times'], allspikes['clusters'],
+            thresholded_cluster_IDs, align_times,
+            t_before, t_after, bin_size, as_rate=False
+        )
+
+        #### run pipeline (with precomputed cd)
+        res = run_cd_pipeline_with_cd(
+            X, time, cd, block_IDs, perturbation, correct=correct,
+            bin_size_ms=bin_size*1000.0, window_ms=200.0,
+            n_boot=2000, seed=1,
+            eval_time_s=0.0,
+        )
+        # res = run_cd_pipeline(
+        #     X, time, block_IDs, perturbation, correct=correct,
+        #     epoch_mask=epoch_mask,
+        #     bin_size_ms=bin_size*1000.0, window_ms=200.0,
+        #     n_boot=2000, seed=1,
+        #     eval_time_s=0.0,                       # onset
+        #     # or: eval_time_s=float(np.nanmedian(q_end_rel))  # go cue
+        # )
 
 
-            # indices_for_ALL = clusters_info_DF['pid'] == pid
-            # indices_for_BS = (clusters_info_DF['pid'] == pid) & (clusters_info_DF['BS_score'] == 1)
+        indices_for_ALL = clusters_info_DF['pid'] == pid
+        indices_for_BS = (clusters_info_DF['pid'] == pid) & (clusters_info_DF['BS_score'] == 1)
 
-            # num_ALL_units = len(np.where(indices_for_ALL == True)[0])
-            # num_BS_units = len(np.where(indices_for_BS == True)[0])
+        num_ALL_units = len(np.where(indices_for_ALL == True)[0])
+        num_BS_units = len(np.where(indices_for_BS == True)[0])
 
-            # if pid in pids_list_SNr_trained:
-            #     hemisphere = 'ipsi'
-            # else:
-            #     hemisphere = 'contra'
+        if pid in pids_list_SNr_trained:
+            hemisphere = 'ipsi'
+        else:
+            hemisphere = 'contra'
 
-            print('pid = ' + pid)
-            # print('Total num units = ' + str(num_ALL_units))
-            # print('Total num BS units = ' + str(num_BS_units))
-            print('Total num trials = ' + str(n_trials))
+        print('pid = ' + pid)
+        print('eid = ' + str(eid))
+        print('hemisphere = ' + hemisphere)
+        print('Total num units = ' + str(num_ALL_units))
+        print('Total num BS units = ' + str(num_BS_units))
+        print('Total num trials = ' + str(n_trials))
 
-            plot_trajectories(res, title=f'CD Projections — Control vs Opto, Block 0/1 (pid={pid})')
-        except:
-            print('Error loading pid = ' + pid + '. Skipping to next session...')
+        plot_trajectories(res, save_figures, figures_path, pid, title=f'CD Projections — Control vs Opto, Block 0/1 (pid={pid})')
