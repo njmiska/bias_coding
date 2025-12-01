@@ -88,19 +88,25 @@ def _label_to_bool(block):
 
 
 def rolling_window_mean(X: np.ndarray, window_bins: int) -> np.ndarray:
-    """Compute sliding-window mean along time axis for X of shape (trials, time, neurons).
-    No stride (i.e., same number of time points out). Window is centered using
-    a simple uniform kernel via cumulative sums (valid for fixed window).
+    """
+    Computes a CAUSAL sliding-window mean (backward-looking).
+    Value at time t is the mean of [t - window + 1, t].
     """
     if window_bins <= 1:
         return X
-    T = X.shape[1]
-    pad = window_bins // 2
-    # pad along time with edge values
-    Xpad = np.pad(X, ((0,0),(pad,pad),(0,0)), mode='edge')
+    
+    # Pad ONLY on the left (the past) with the first value (edge padding)
+    # Shape: (trials, time + window, neurons)
+    Xpad = np.pad(X, ((0,0), (window_bins, 0), (0,0)), mode='edge')
+    
+    # Cumulative sum trick for fast averaging
     csum = np.cumsum(Xpad, axis=1)
-    win = csum[:, window_bins:, :] - csum[:, :-window_bins, :]
-    return win / window_bins
+    
+    # Subtract the lagged csum to get the window sum
+    # The valid part starts after the padding
+    win_sum = csum[:, window_bins:, :] - csum[:, :-window_bins, :]
+    
+    return win_sum / window_bins
 
 
 def time_mask(time: np.ndarray, window: Tuple[float, float]) -> np.ndarray:
@@ -610,11 +616,46 @@ def run_cd_pipeline_with_cd(
     return CDResults(cd, proj, time, block_bool, tuple(block_levels), np.asarray(perturbation, bool), session_id, end_idx, diags, metrics)
 
 
+# ------------------------------ Orthogonal analysis ------------------------------------
+
+def analyze_orthogonal_movement(X_centered, cd, t_start=0.2, t_end=0.6):
+    """
+    Compares the magnitude of neural activity in the Null Space (Orthogonal to CD).
+    """
+    # 1. Get data
+    # Shape: (n_trials, n_time, n_neurons) - You need the raw X or similar
+    # Assuming 'results' stores the raw projection, we might need to reconstruct or load X.
+    # If X is not saved in results, you might need to run this inside your main loop.
+    
+    # conceptual code assuming you have X_centered (mean-subtracted firing rates)
+    # and the cd vector (n_neurons,)
+    
+    # Project X onto CD
+    proj_cd = np.tensordot(X_centered, cd, axes=1) # (trials, time)
+    
+    # Reconstruct the "CD Component" of the population activity
+    # Shape: (trials, time, neurons)
+    X_cd_component = proj_cd[..., None] * cd[None, None, :]
+    
+    # Get the "Orthogonal Component" (The Residual)
+    X_orth = X_centered - X_cd_component
+    
+    # Calculate Magnitude (Energy) of this orthogonal activity over time
+    # Norm per trial, per timepoint
+    orth_energy = np.linalg.norm(X_orth, axis=2) # (trials, time)
+    
+    # Plot Mean Orthogonal Energy for Control vs Opto
+    # If Opto line is much higher than Control, the network is "confused/driven".
+    return orth_energy
+
+
 # ------------------------------ Plotting ------------------------------------
 
-def plot_trajectories(results: CDResults, save_figures, figure_save_path, figure_prefix, smooth_ms: Optional[float] = None, title: Optional[str] = None):
-    """Plot mean ± SEM trajectories for control vs opto and block==False/True.
-    Uses default matplotlib colors; no explicit color choices.
+def plot_trajectories(results, save_figures, figure_save_path, figure_prefix, 
+                      smooth_ms: float = None, title: str = None, 
+                      custom_colors: dict = None):
+    """
+    Plots mean trajectories with custom colors.
     """
     proj = results.proj
     time = results.time
@@ -622,8 +663,21 @@ def plot_trajectories(results: CDResults, save_figures, figure_save_path, figure
     ctrl = ~results.perturbation
     opto = ~ctrl
 
+    # Default Color Scheme: Black/Grey for Control, Blue/LightBlue for Stim
+    colors = {
+        'Control • Block 0': 'gray',          # Control Right (or Low Prob)
+        'Control • Block 1': 'black',         # Control Left (or High Prob)
+        'Opto • Block 0':    'deepskyblue',   # Stim Right
+        'Opto • Block 1':    'blue',          # Stim Left
+    }
+    
+    # Override if user provides dictionary
+    if custom_colors:
+        colors.update(custom_colors)
+
     def _mean_sem(mat):
-        return np.nanmean(mat, axis=0), np.nanstd(mat, axis=0) / np.sqrt(max(1, mat.shape[0]))
+        if mat.shape[0] == 0: return None, None
+        return np.nanmean(mat, axis=0), np.nanstd(mat, axis=0) / np.sqrt(mat.shape[0])
 
     groups = {
         'Control • Block 0': proj[ctrl & ~block],
@@ -633,21 +687,29 @@ def plot_trajectories(results: CDResults, save_figures, figure_save_path, figure
     }
 
     plt.figure(figsize=(8,4))
+    
     for label, mat in groups.items():
-        if mat.size == 0:
-            continue
+        if mat.size == 0: continue
+        
         mu, se = _mean_sem(mat)
-        plt.plot(time, mu, label=label)
-        plt.fill_between(time, mu - se, mu + se, alpha=0.2)
-    plt.axvline(time[results.end_delay_idx], linestyle='--')
+        if mu is None: continue
+        
+        c = colors.get(label, 'k') # Default to black if label missing
+        
+        plt.plot(time, mu, label=label, color=c, lw=2)
+        plt.fill_between(time, mu - se, mu + se, color=c, alpha=0.2)
+        
+    plt.axvline(time[results.end_delay_idx], linestyle='--', color='k', alpha=0.5)
+    plt.axvline(0, linestyle='-', color='k', alpha=0.3) # Laser onset
     plt.xlabel('Time (s)')
     plt.ylabel('Projection (cd^T x)')
     if title:
         plt.title(title)
-    plt.legend()
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left') # Legend outside plot
     plt.tight_layout()
+    
     if save_figures == 1:
-        plt.savefig(figure_save_path + figure_prefix + '_psych.png')  # Change the path as needed
+        plt.savefig(figure_save_path + '/' + figure_prefix + '_psych.png')
         plt.close()
     else:
         plt.show()
@@ -663,11 +725,24 @@ from iblatlas.atlas import AllenAtlas, BrainRegions
 from scipy import stats
 import statistics
 from pathlib import Path
+import pickle
+import pandas as pd
 
 import sys
 sys.path.append('/Users/natemiska/python/bias_coding')
-from functions_optostim import isbiasblockselective_03, generate_pseudo_sessions
+from functions_optostim import isbiasblockselective_03, generate_pseudo_sessions, get_drift_indices
 from metadata_optostim import light_artifact_units_SNr,light_artifact_units_SNr_contra,pids_list_SNr,pids_list_SNr_contra,inhibition_trials_range_list_SNr,inhibition_trials_range_list_SNr_contra,pids_list_SNr_trained,pids_list_SNr_contra_trained,excitation_trials_range_list_SNr_trained,inhibition_trials_range_list_SNr_trained,excitation_trials_range_list_SNr_contra_trained,inhibition_trials_range_list_SNr_contra_trained,light_artifact_units_SNr_trained,light_artifact_units_SNr_contra_trained,pids_list_ZI_trained,pids_list_ZI_trained_contra,excitation_trials_range_list_ZI_trained,inhibition_trials_range_list_ZI_trained,excitation_trials_range_list_ZI_trained_contra,inhibition_trials_range_list_ZI_trained_contra,light_artifact_units_ZI_trained,light_artifact_units_ZI_trained_contra, pids_list_SNr_reverse, excitation_trials_range_list_SNr_reverse, inhibition_trials_range_list_SNr_reverse, light_artifact_units_SNr_reverse
+
+# new_path = '/Users/natemiska/int-brain-lab/GLM-HMM'
+# os.chdir(new_path)
+sys.path.append('/Users/natemiska/int-brain-lab/GLM-HMM')
+
+from psychometric_utils import get_glmhmm_indices
+
+# load glm-hmm labels
+with open("/Users/natemiska/int-brain-lab/GLM-HMM/all_subject_states.csv", 'rb') as pickle_file:
+    state_probability = pickle.load(pickle_file)
+
 
 one = ONE(base_url='https://alyx.internationalbrainlab.org', cache_dir=Path.home() / '/Users/natemiska/Downloads/ONE/alyx.internationalbrainlab.org')
 # one = ONE(base_url='https://alyx.internationalbrainlab.org')
@@ -690,11 +765,21 @@ IBL_quality_label_threshold = 0.6
 
 firing_rate_threshold = 1
 
+presence_threshold = 0.75  # Strict threshold = 0.9
+
+remove_drift_units = 1
+
+remove_axonal_units = 0
+
 only_include_BS_units = 0
 
-save_figures = 1
-figures_path = '/Users/natemiska/Desktop/for_sonja_102825'
+use_GLMHMM_engaged_indices = 0
+n_states = 2
 
+save_figures = 1
+figures_path = '/Users/natemiska/Documents/Lab_Data/LabMeetingDec2025/CD_analysis'
+output_file = figures_path + '/CD_population_results_IBLOK_final.pkl'
+individual_pid_prefix = 'IBLOK_final'
 
 #####################################################################################
 if condition == 'SNr_forBSanalysis':
@@ -732,6 +817,8 @@ clusters_info_DF = pd.read_pickle('~/python/saved_figures/' + condition + '_' + 
 with open(condition + '_' + onset_alignment + '_delta_fr.pickle', 'rb') as f:
     data = pickle.load(f)
 
+population_results = []
+
 #####################################################################################
 
 if __name__ == "__main__":
@@ -742,22 +829,35 @@ if __name__ == "__main__":
 
         #### load data
         pid = pids[main_loop_num]
+        print(f"Processing session {main_loop_num+1}/{len(pids)}: {pid}")
         ssl = SpikeSortingLoader(pid=pid, one=one, atlas=ba)
         eid = ssl.eid
+        ses_info = one.get_details(eid)
+        current_mouse_ID = ses_info['subject']
         trials = one.load_object(eid, 'trials')
         inhibition_trials_range = inhibition_trials_range_list[main_loop_num]
         ses_path = one.eid2path(eid)
-
         probe_label = ssl.pname
         spikes, clusters, channels = ssl.load_spike_sorting(enforce_version=False)
+        if remove_axonal_units == 1:
+            try:
+                spike_wfs = one.load_object(ssl.eid, '_phy_spikes_subset', collection='alf/' + probe_label + '/pykilosort')
+                wf_clusterIDs = spikes['clusters'][spike_wfs['spikes']]
+            except:
+                print('waveform loading failed, skipping axonal units...')
         clusters = ssl.merge_clusters(spikes, clusters, channels)
         clusters_labels = clusters['label']
-        # clusters_regions = clusters['acronym']
         allspikes = spikes
+        try:
+            brain_acronyms_percluster = clusters['acronym']
+        except:
+            #### if any issues with probe alignment, cluster acronyms = nan
+            brain_acronyms_percluster = np.empty(len(clusters['ks2_label']))
+            brain_acronyms_percluster[:] = np.nan
 
         #### remove low quality and light artifact clusters
         light_artifact_unit_IDs = light_artifact_units_list[main_loop_num]
-        thresholded_cluster_IDs = np.where(clusters_labels > IBL_quality_label_threshold)[0]
+        thresholded_cluster_IDs = np.where(clusters_labels >= IBL_quality_label_threshold)[0]
         thresholded_cluster_IDs = np.setdiff1d(thresholded_cluster_IDs, light_artifact_unit_IDs)
         n_clusters = len(thresholded_cluster_IDs)
 
@@ -767,9 +867,6 @@ if __name__ == "__main__":
 
         if inhibition_trials_range == 'ALL':
             inhibition_trials_range = range(0,len(trials['contrastLeft']))
-
-        #### block IDs only for inhibition trials range in 80/20 blocks
-        block_IDs = (trials.probabilityLeft[inhibition_trials_range] > 0.5).astype(int)
 
         #### loads laser intervals data
         try:
@@ -800,7 +897,16 @@ if __name__ == "__main__":
         inhibition_trials_numbers = inhibition_trials_numbers[np.isnan(inhibition_trials_numbers) == 0]
         nonstim_trials_numbers = nonstim_trials_numbers[np.isnan(nonstim_trials_numbers) == 0]
         excitation_trials_numbers = np.empty(0)
-        n_trials = len(inhibition_trials_range)
+
+        if use_GLMHMM_engaged_indices == 1:
+            try:
+                engaged_idx, disengaged_idx = get_glmhmm_indices(current_mouse_ID, str(eid), state_probability, n_states)
+                inhibition_trials_numbers = np.intersect1d(engaged_idx, inhibition_trials_numbers)
+                nonstim_trials_numbers = np.intersect1d(engaged_idx, nonstim_trials_numbers)
+                inhibition_trials_range = np.intersect1d(engaged_idx, inhibition_trials_range) ### important - since CD analysis uses inhibition_trials_range as range of trials input that this variable also needs to be restricted to engaged trials only
+            except:
+                print('GLM-HMM trials loading failed for PID = ' + pid + ' skipping...')
+                continue
 
         #### Bias selectivity analysis
         BS_scores = np.zeros(len(clusters_labels))
@@ -820,6 +926,60 @@ if __name__ == "__main__":
             old_thresholded_cluster_IDs = thresholded_cluster_IDs
             thresholded_cluster_IDs = np.where(BS_scores == 1)[0]
             n_clusters = len(thresholded_cluster_IDs)
+
+        #### Remove any SNr units (this may not be sufficient for probes entering SNr in this experiment, for various reasons - may need to revisit)
+        SNr_unit_IDs = np.where(brain_acronyms_percluster == 'SNr')[0]
+        if len(SNr_unit_IDs) == 0:
+            print('no SNr units detected')
+        else:
+            print('SNr units detected - removing')
+            thresholded_cluster_IDs = np.setdiff1d(thresholded_cluster_IDs,SNr_unit_IDs)
+
+        #### Remove any cortical units
+        print('Removing any cortical units')
+        isocortex_id = br.acronym2id('Isocortex')[0]
+        region_ids = br.acronym2id(brain_acronyms_percluster)
+
+        cortical_IDs = []
+
+        for cluster_ID, region_ID in zip(range(0,len(brain_acronyms_percluster)), region_ids):
+            # ancestors returns the lineage of the region. 
+            # We check if Isocortex (315) is in that lineage.
+            ancestors = br.ancestors(region_ID)
+            
+            if isocortex_id in ancestors.id:
+                cortical_IDs.append(cluster_ID)
+
+        thresholded_cluster_IDs = np.setdiff1d(thresholded_cluster_IDs,cortical_IDs)
+        print(str(len(cortical_IDs)) + ' cortical units removed')
+
+        ### get waveforms to determine whether axonal unit and remove axonal units
+        if remove_axonal_units == 1:
+            try:
+                axonal_unit_IDs = []
+                for j in thresholded_cluster_IDs:
+                    wf_idx = np.where(wf_clusterIDs == j)[0]
+                    wfs = spike_wfs['waveforms'][wf_idx, :, :]
+                    # Compute average waveform on channel with max signal (chn_index 0)
+                    wf_avg_chn_max = np.mean(wfs[:, :, 0], axis=0)
+                    wf_avg_chn_max_nonnorm = wf_avg_chn_max
+                    wf_avg_chn_max = wf_avg_chn_max - np.mean(wf_avg_chn_max[0:15])
+                    if max(wf_avg_chn_max) + min(wf_avg_chn_max) > 0:
+                        axonal_unit_score = 1
+                        axonal_unit_IDs.append(j)
+                    else:
+                        axonal_unit_score = 0
+
+                thresholded_cluster_IDs = np.setdiff1d(thresholded_cluster_IDs,axonal_unit_IDs)
+                print(str(len(axonal_unit_IDs)) + ' axonal units removed')
+            except:
+                print('aw shucks no axons')
+
+        #### remove units based on presence ratio
+        if 'presence_ratio' in clusters:
+            stable_units = np.where(clusters['presence_ratio'] > presence_threshold)[0]
+            thresholded_cluster_IDs = np.intersect1d(thresholded_cluster_IDs, stable_units)
+            print(f"Removed {n_clusters - len(thresholded_cluster_IDs)} units due to low presence ratio.")
 
         #### creates boolean array to represent stim/nonstim trials in inhibition range
         perturbation = np.isin(inhibition_trials_range, inhibition_trials_numbers)
@@ -851,6 +1011,38 @@ if __name__ == "__main__":
             thresholded_cluster_IDs, align_times_cd,
             t_before_cd, t_after_cd, bin_size, as_rate=False
         )
+
+        #### block IDs only for inhibition trials range in 80/20 blocks
+        block_IDs = (trials.probabilityLeft[inhibition_trials_range] > 0.5).astype(int)
+
+        #### Identify and remove drifting units
+        if remove_drift_units == 1:
+            drifting_indices_local = get_drift_indices(X_cd, block_IDs, drift_threshold=0.35)
+
+            if len(drifting_indices_local) > 0:
+                # Get the actual Cluster IDs to remove (map back from local index to cluster ID)
+                drifting_cluster_ids = thresholded_cluster_IDs[drifting_indices_local]
+                
+                print(f"Detected {len(drifting_cluster_ids)} drifting units. Removing...")
+                
+                # 2. Remove them from your list
+                thresholded_cluster_IDs = np.setdiff1d(thresholded_cluster_IDs, drifting_cluster_ids)
+                
+                # # 3. REBUILD X with the clean list
+                # # You must rebuild X because X shape must match the neuron list for CD analysis
+                # X, time, unit_ids = build_binned_X(
+                #     allspikes['times'], allspikes['clusters'],
+                #     thresholded_cluster_IDs, align_times,
+                #     t_before, t_after, bin_size, as_rate=False
+                # )
+                
+                # Also rebuild X_cd if you used different alignment for it
+                X_cd, time_cd, _ = build_binned_X(
+                    allspikes['times'], allspikes['clusters'],
+                    thresholded_cluster_IDs, align_times_cd,
+                    t_before_cd, t_after_cd, bin_size, as_rate=False
+                )
+
         # mask [0, enforced_qp_len_i)
         epoch_mask_cd = make_interval_mask(time_cd, np.zeros_like(enforced_qp_len), enforced_qp_len)
 
@@ -889,7 +1081,61 @@ if __name__ == "__main__":
         #     # or: eval_time_s=float(np.nanmedian(q_end_rel))  # go cue
         # )
 
+        #### Begin extract and store metrics
+        # 1. Define masks for the 4 conditions of interest
+        ctrl = ~res.perturbation
+        opto = ~ctrl
+        blk1 = res.block_bool      # Usually "Left" or "High Prob Left"
+        blk0 = ~res.block_bool     # Usually "Right"
 
+        # 2. Helper to get mean trace over trials (shape: n_time,)
+        def get_mean_trace(mask):
+            if np.sum(mask) == 0: return np.full(res.time.shape, np.nan)
+            return np.nanmean(res.proj[mask], axis=0)
+
+        # 3. Compute mean trajectories for this session
+        trace_ctrl_b1 = get_mean_trace(ctrl & blk1)
+        trace_ctrl_b0 = get_mean_trace(ctrl & blk0)
+        trace_opto_b1 = get_mean_trace(opto & blk1)
+        trace_opto_b0 = get_mean_trace(opto & blk0)
+
+        # 4. Compute Separation (Difference) Traces
+        # Separation = Block1 - Block0 (The CD is defined to maximize this, so it should be positive)
+        sep_ctrl_trace = trace_ctrl_b1 - trace_ctrl_b0
+        sep_opto_trace = trace_opto_b1 - trace_opto_b0
+
+        # 5. Determine Hemisphere (metadata)
+        if pid in pids_list_SNr_trained or pid in pids_list_ZI_trained:
+            hemisphere = 'Ipsi'
+        elif pid in pids_list_SNr_contra_trained or pid in pids_list_ZI_trained_contra:
+            hemisphere = 'Contra'
+        else:
+            hemisphere = 'Other'
+
+        # 6. Store in a dictionary
+        session_data = {
+            'pid': pid,
+            'hemisphere': hemisphere,
+            'time': res.time, # Store time axis (should be same for all, but good to have)
+            'traces': {
+                'ctrl_b1': trace_ctrl_b1,
+                'ctrl_b0': trace_ctrl_b0,
+                'opto_b1': trace_opto_b1,
+                'opto_b0': trace_opto_b0
+            },
+            'separation': {
+                'ctrl': sep_ctrl_trace,
+                'opto': sep_opto_trace,
+                'delta': sep_ctrl_trace - sep_opto_trace # The "Collapse" magnitude
+            },
+            'n_units': n_clusters,
+            'n_trials': len(inhibition_trials_range)
+        }
+
+        population_results.append(session_data)
+        #### End extract and store metrics
+
+        #### Plot/save individual insertion data
         indices_for_ALL = clusters_info_DF['pid'] == pid
         indices_for_BS = (clusters_info_DF['pid'] == pid) & (clusters_info_DF['BS_score'] == 1)
 
@@ -904,8 +1150,40 @@ if __name__ == "__main__":
         print('pid = ' + pid)
         print('eid = ' + str(eid))
         print('hemisphere = ' + hemisphere)
-        print('Total num units = ' + str(num_ALL_units))
-        print('Total num BS units = ' + str(num_BS_units))
-        print('Total num trials = ' + str(n_trials))
+        print('Total num units = ' + str(len(thresholded_cluster_IDs)))
+        if only_include_BS_units == 1:
+            print('Total num BS units = ' + str(num_BS_units))
+        print('Total num trials = ' + str(len(inhibition_trials_range)))
 
-        plot_trajectories(res, save_figures, figures_path, pid, title=f'CD Projections — Control vs Opto, Block 0/1 (pid={pid})')
+        plot_trajectories(res, save_figures, figures_path, pid + individual_pid_prefix, title=f'PID=' + pid[0:5] + ' ' + hemisphere + ' units=' + str(len(thresholded_cluster_IDs)) + ' trials=' + str(len(inhibition_trials_range)))
+
+    # Final Save
+    with open(output_file, 'wb') as f:
+        pickle.dump(population_results, f)
+    print(f"Saved population results to {output_file}")
+
+# from functions_optostim import peri_event_time_histogram
+# t_before = 10#2.5#10
+# t_after = 20#5#20
+# ### Parameters
+# bin_size=0.05
+# smoothing=0.05
+# normalize_to_baseline = 0
+# ax1, plot_edge, nonstim_all_peth = peri_event_time_histogram(allspikes.times,  # Spike times first
+#                                         allspikes.clusters,  # Then cluster ids
+#                                         trials.intervals[:,0],
+#                                         [1],  # Identity of the cluster we plot
+#                                         t_before=t_before, t_after=t_after,  # Time before and after the event
+#                                         error_bars='sem',  # Whether we want Stdev, SEM, or no error
+#                                         smoothing=smoothing,
+#                                         bin_size=bin_size,
+#                                         include_raster=True,  # adds a raster to the bottom
+#                                         n_rasters=55,  # How many raster traces to include
+#                                         # ax=ax1,  # Make sure we plot to the axis we created
+#                                         yticks=False,
+#                                         pethline_kwargs={'color': 'black', 'lw': 2},
+#                                         errbar_kwargs={'color': 'black', 'alpha': 0.5},
+#                                         eventline_kwargs={'color': 'black', 'alpha': 0.6},
+#                                         raster_kwargs={'color': 'black', 'lw': 0.5},
+#                                         normalize_to_baseline = normalize_to_baseline)
+# plt.show()

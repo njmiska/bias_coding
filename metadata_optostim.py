@@ -29,40 +29,45 @@ light_artifact_units_SNr_directstim = [[1,4,5,10,11,38,59,162,173,175,206,218],
 
 ### not correct? use other metadata file to see correct eids
 pids_list_SNr = ['518b61c2-45bc-40c2-bee1-d87b0d1986ac','e4696ffd-248e-41cb-a62a-16e320b8cd7e', #SWC_NM_018 15/6, SWC_NM_018 16/6
-                 '59bf32ee-1d83-4a7f-bf14-590b610c96e0', #SWC_NM_018 17/6 (few trials)
+                #  '59bf32ee-1d83-4a7f-bf14-590b610c96e0', #SWC_NM_018 17/6 (few trials) X
                  '0d60096b-a037-4b6f-a50c-ff469298ba71', #SWC_NM_012
                  'f080b240-b025-4aa4-b0c3-74809c0cc3db','464b7b30-7456-483b-8e57-e3dbc918079d', #SWC_NM_021 22/3/22, 24/3 (goes through IC, very little modulation)
                  '503cccbe-da42-4451-b97c-34e1726595d7', 'dc1dc606-699e-48ac-ab9d-53b202d77b66',# SWC_NM_016 ###for this mouse, only L hemi stim gives stereotypes behaviour effect...
                  'e91b783b-ec23-4963-9cc0-601c4d093d0f'] #SWC_NM_021 SNr 23/3/22
                  # SWC_NM_027! (7/9 and 8/9) need to manually check each trial for stim...
-pids_list_SNr_trained = ['518b61c2-45bc-40c2-bee1-d87b0d1986ac','e4696ffd-248e-41cb-a62a-16e320b8cd7e', #SWC_NM_018 15/6, SWC_NM_018 16/6
-                         '59bf32ee-1d83-4a7f-bf14-590b610c96e0', #SWC_NM_018 17/6 (few trials)
-                         '0d60096b-a037-4b6f-a50c-ff469298ba71', #SWC_NM_012 (poor/random stim trial performance)
-                         '930adc32-438a-4548-a741-dc8a487ebd4f', #SWC_NM_096 23/11 L probe
-                         '7778d726-767e-4d1b-a879-01faf2075828', #SWC_NM_096 24/11 R probe
-                         '068538e4-08a7-4d11-a807-e9cf698d63b8', #SWC_NM_096 25/11 L probe
-                         '72b7c463-ed30-4c24-8ddf-5e8eddafc46e', #SWC_NM_096 26/11 R probe
-                         'f88afd14-4b96-4833-a463-536f66d30592', #SWC_NM_097 23/11 R probe
-                         '3e83939c-b401-427e-94d9-e76ef4c1755f', #SWC_NM_097 24/11 R probe
-                         '9fd3bd93-e5bf-42d1-ab69-16da50cbaf6b'] #SWC_NM_097 25/11 L probe
+pids_list_SNr_trained = ['518b61c2-45bc-40c2-bee1-d87b0d1986ac', #SWC_NM_018 15/6 probe01
+                         'e4696ffd-248e-41cb-a62a-16e320b8cd7e', #SWC_NM_018 16/6 probe01 
+                        #  '59bf32ee-1d83-4a7f-bf14-590b610c96e0', #SWC_NM_018 17/6 (few trials) X
+                        #  '0d60096b-a037-4b6f-a50c-ff469298ba71', #SWC_NM_012 (poor/random stim trial performance)
+                         '930adc32-438a-4548-a741-dc8a487ebd4f', #SWC_NM_096 23/09 L probe
+                         '7778d726-767e-4d1b-a879-01faf2075828', #SWC_NM_096 24/09 R probe ### alignment seems good; small group of SNr units at bottom
+                         '068538e4-08a7-4d11-a807-e9cf698d63b8', #SWC_NM_096 25/09 L probe
+                         '72b7c463-ed30-4c24-8ddf-5e8eddafc46e', #SWC_NM_096 26/09 R probe ### significant chunk of this recording is in ipsilateral SNr! need to remove SNr units for cd analysis...
+                        #  'f88afd14-4b96-4833-a463-536f66d30592', #SWC_NM_097 23/09 R probe ### No obvious bias reduction in behavior
+                        #  '3e83939c-b401-427e-94d9-e76ef4c1755f', #SWC_NM_097 24/09 R probe ### No bias reduction in behavior
+                         '9fd3bd93-e5bf-42d1-ab69-16da50cbaf6b'] #SWC_NM_097 25/09 L probe ### Not much bias reduction in behavior, voy
                          
 
-pids_list_SNr_contra = ['b96ed9ce-1a0a-4818-b896-8aa79ca26801','b7998d00-b4c4-4695-8fc3-f8001539c90e', #SWC_NM_018 15/6, SWC_NM_018 16/6
-                        'eb0937f5-951b-4bf8-9dc4-83ed776a1503', #SWC_NM_018 17/6 (few trials)
+pids_list_SNr_contra = [
+                        'b96ed9ce-1a0a-4818-b896-8aa79ca26801', #SWC_NM_018 15/6 #questionable quality rec
+                        'b7998d00-b4c4-4695-8fc3-f8001539c90e', #SWC_NM_018 16/6
+                        # 'eb0937f5-951b-4bf8-9dc4-83ed776a1503', #SWC_NM_018 17/6 (few trials)
                         '3f9ff280-98b2-478a-b38f-b49294923756', #SWC_NM_021 24/3
                         '06cdb7a7-df86-48ea-8533-b1e383436987', 'a9c28dc5-6e1d-4750-8fff-1113ed26e6e9'] # SWC_NM_016
-pids_list_SNr_contra_trained = ['b96ed9ce-1a0a-4818-b896-8aa79ca26801','b7998d00-b4c4-4695-8fc3-f8001539c90e', #SWC_NM_018 15/6, SWC_NM_018 16/6
-                                'eb0937f5-951b-4bf8-9dc4-83ed776a1503', #SWC_NM_018 17/6 (few trials) - shit session
-                                'caf25d31-2d5b-45a9-85b4-585e380ebab2', #SWC_NM_096 23/11 R probe
-                                '7a79b7cf-4d29-4a83-8d33-6bd3e4ef3307', #SWC_NM_096 24/11 L probe
-                                '94a5c20d-82be-4040-80cc-03ef2e5854df', #SWC_NM_096 25/11 R probe
-                                '3dd67257-217e-4d25-bb2b-59a606d944a7', #SWC_NM_096 26/11 L probe
-                                '45627303-535d-4f08-b88a-f1e27d841cf6', #SWC_NM_097 23/11 L probe
-                                '8c36f12e-3ca8-4c14-8d7f-73c8f38cf397'] #SWC_NM_097 25/11 R probe
+pids_list_SNr_contra_trained = [
+                                # 'b96ed9ce-1a0a-4818-b896-8aa79ca26801',#SWC_NM_018 15/6, #questionable quality rec X?
+                                'b7998d00-b4c4-4695-8fc3-f8001539c90e', # SWC_NM_018 16/6
+                                # 'eb0937f5-951b-4bf8-9dc4-83ed776a1503', #SWC_NM_018 17/6 (few trials) - shit session X
+                                'caf25d31-2d5b-45a9-85b4-585e380ebab2', #SWC_NM_096 23/09 R probe ## questionable probe location - overlapping with longer track, questionable CD X?
+                                '7a79b7cf-4d29-4a83-8d33-6bd3e4ef3307', #SWC_NM_096 24/09 L probe ## medium confidence on probe alignment; quality looks good
+                                '94a5c20d-82be-4040-80cc-03ef2e5854df', #SWC_NM_096 25/09 R probe ## ### possibly not the correct probe track. possible this was not labeled with DiI. General cortex - POST - MB pattern likely correct
+                                '3dd67257-217e-4d25-bb2b-59a606d944a7', #SWC_NM_096 26/09 L probe
+                                # '45627303-535d-4f08-b88a-f1e27d841cf6', #SWC_NM_097 23/09 L probe ### No obvious bias reduction in behavior, probe alignment and recording quality look good
+                                '8c36f12e-3ca8-4c14-8d7f-73c8f38cf397'] #SWC_NM_097 25/09 R probe ### Not much bias reduction in behavior
 
 excitation_trials_range_list_SNr = [list(range(242,364)) + list(range(461,581)) + list(range(674,769)), #SWC_NM_018 15/6
                                     list(range(283,423)) + list(range(528,660)) + list(range(767,833)), #SWC_NM_018 16/6
-                                    list(range(371,422)) + list(range(485,501)), #SWC_NM_018 17/6
+                                    # list(range(371,422)) + list(range(485,501)), #SWC_NM_018 17/6
                                     list(range(180,369)), #SWC_NM_012
                                     list(range(83,136)) + list(range(207,269)) + list(range(296,315)), #SWC_NM_021 22/3
                                     list(range(67,169)) + list(range(283,370)), #SWC_NM_021 24/3
@@ -72,7 +77,7 @@ excitation_trials_range_list_SNr = [list(range(242,364)) + list(range(461,581)) 
 
 inhibition_trials_range_list_SNr = [list(range(139,242)) + list(range(364,461)) + list(range(581,674)) + list(range(769,798)), #SWC_NM_018 15/6
                                     list(range(121,283)) + list(range(423,528)) + list(range(660,767)), #SWC_NM_018 16/6
-                                    list(range(422,485)), #SWC_NM_018 17/6
+                                    # list(range(422,485)), #SWC_NM_018 17/6
                                     list(range(75,180)), #SWC_NM_012
                                     list(range(0,83)) + list(range(269,296)), #SWC_NM_021 22/3
                                     list(range(0,67)) + list(range(169,283)), #SWC_NM_021 24/3
@@ -81,86 +86,89 @@ inhibition_trials_range_list_SNr = [list(range(139,242)) + list(range(364,461)) 
                                     list(range(0,54)) + list(range(140,193)) + list(range(276,358))] #SWC_NM_021 SNr 23/3/22
 excitation_trials_range_list_SNr_trained = [list(range(242,364)) + list(range(461,581)) + list(range(674,769)), #SWC_NM_018 15/6
                                     list(range(283,423)) + list(range(528,660)) + list(range(767,833)), #SWC_NM_018 16/6
-                                    list(range(371,422)) + list(range(485,501)), #SWC_NM_018 17/6
-                                    list(range(180,369)), #SWC_NM_012
+                                    # list(range(371,422)) + list(range(485,501)), #SWC_NM_018 17/6
+                                    # list(range(180,369)), #SWC_NM_012
                                     [], #96
                                     [], #96
                                     [], #96
                                     [], #96
-                                    [], #97
-                                    [], #97
+                                    # [], #97
+                                    # [], #97
                                     []] #97
 
 inhibition_trials_range_list_SNr_trained = [list(range(139,242)) + list(range(364,461)) + list(range(581,674)) + list(range(769,798)), #SWC_NM_018 15/6
                                     list(range(121,283)) + list(range(423,528)) + list(range(660,767)), #SWC_NM_018 16/6
-                                    list(range(422,485)), #SWC_NM_018 17/6
-                                    list(range(75,180)), #SWC_NM_012
+                                    # list(range(422,485)), #SWC_NM_018 17/6
+                                    # list(range(75,180)), #SWC_NM_012
                                     list(range(0,410)) + list(range(516,776)), #96
                                     'ALL', #96
                                     'ALL', #96
                                     'ALL', #96
-                                    'ALL', #97
-                                    'ALL', #97
+                                    # 'ALL', #97
+                                    # 'ALL', #97
                                     'ALL'] #97
 
 excitation_trials_range_list_SNr_contra = [list(range(242,364)) + list(range(461,581)) + list(range(674,769)), #SWC_NM_018 15/6
                                     list(range(283,423)) + list(range(528,660)) + list(range(767,833)), #SWC_NM_018 16/6
-                                    list(range(371,422)) + list(range(485,501)), #SWC_NM_018 17/6
+                                    # list(range(371,422)) + list(range(485,501)), #SWC_NM_018 17/6
                                     list(range(67,169)) + list(range(283,370)), #SWC_NM_021 24/3
                                     list(range(50,100)) + list(range(150,230)), # SWC_NM_016
                                     list(range(69,197)) + list(range(320,473))] # SWC_NM_016
 inhibition_trials_range_list_SNr_contra = [list(range(139,242)) + list(range(364,461)) + list(range(581,674)) + list(range(769,798)), #SWC_NM_018 15/6
                                     list(range(121,283)) + list(range(423,528)) + list(range(660,767)), #SWC_NM_018 16/6
-                                    list(range(422,485)), #SWC_NM_018 17/6
+                                    # list(range(422,485)), #SWC_NM_018 17/6
                                     list(range(0,67)) + list(range(169,283)), #SWC_NM_021 24/3
                                     list(range(0,50)) + list(range(100,150)) + list(range(230,304)), # SWC_NM_016
                                     list(range(0,69)) + list(range(197,320))] # SWC_NM_016
-excitation_trials_range_list_SNr_contra_trained = [list(range(242,364)) + list(range(461,581)) + list(range(674,769)), #SWC_NM_018 15/6
+excitation_trials_range_list_SNr_contra_trained = [#list(range(242,364)) + list(range(461,581)) + list(range(674,769)), #SWC_NM_018 15/6 X
                                     list(range(283,423)) + list(range(528,660)) + list(range(767,833)), #SWC_NM_018 16/6
-                                    list(range(371,422)) + list(range(485,501)), #SWC_NM_018 17/6
+                                    # list(range(371,422)) + list(range(485,501)), #SWC_NM_018 17/6
                                     [], #96
                                     [], #96
                                     [], #96
                                     [], #96
-                                    [], #97
+                                    # [], #97
                                     []] #97
-inhibition_trials_range_list_SNr_contra_trained = [list(range(139,242)) + list(range(364,461)) + list(range(581,674)) + list(range(769,798)), #SWC_NM_018 15/6
+inhibition_trials_range_list_SNr_contra_trained = [#list(range(139,242)) + list(range(364,461)) + list(range(581,674)) + list(range(769,798)), #SWC_NM_018 15/6 X
                                     list(range(121,283)) + list(range(423,528)) + list(range(660,767)), #SWC_NM_018 16/6
-                                    list(range(422,485)), #SWC_NM_018 17/6
+                                    # list(range(422,485)), #SWC_NM_018 17/6
                                     list(range(0,410)) + list(range(516,776)), #96
                                     'ALL', #96
                                     'ALL', #96
                                     'ALL', #96
-                                    'ALL', #97
+                                    # 'ALL', #97
                                     'ALL'] #97
 
-light_artifact_units_SNr = [[0,3,4,5,6,7,8],[[62,125,227]], #SWC_NM_018 16/6
-                            [83,87,125,148,153],[],[38,86,193,283],[],[],[], #SWC_NM_018 17/6, #SWC_NM_021 22/3
+light_artifact_units_SNr = [[0,3,4,5,6,7,8],[[62,125,227]], #SWC_NM_018 15/6, 16/6
+                            # [83,87,125,148,153], #SWC_NM_018 17/6,
+                            [],[38,86,193,283],[],[],[], #SWC_NM_021 22/3
                             [1,4,5,10,11,59,162,173,175,206]]
 
-light_artifact_units_SNr_trained = [[0,3,4,5,6,7,8],[[62,125,227]], #SWC_NM_018 16/6
-                                    [83,87,125,148,153],[], #SWC_NM_018 17/6, SWC_NM_012
+light_artifact_units_SNr_trained = [[0,3,4,5,6,7,8],[[62,125,227]], #SWC_NM_018 15/6, 16/6
+                                    # [83,87,125,148,153], #SWC_NM_018 17/6,
+                                    # [],  #SWC_NM_012
                                     [], #96
                                     [], #96
                                     [], #96
                                     [], #96
-                                    [], #97
-                                    [], #97
+                                    # [], #97
+                                    # [], #97
                                     []] #97
 
 light_artifact_units_SNr_contra = [[127,128,146,147,203], #SWC_NM_018 15/6
                                     [3,119,139,148,178,187,244,254,255,258], #SWC_NM_018 16/6
-                                    [],[],[],
+                                    [], #SWC_NM_018 17/6
+                                    [],[],
                                     [11,66,415,420,422]] #SWC_NM_016 23/6
 
-light_artifact_units_SNr_contra_trained = [[127,128,146,147,203], #SWC_NM_018 15/6
+light_artifact_units_SNr_contra_trained = [#[127,128,146,147,203], #SWC_NM_018 15/6
                                     [3,119,139,148,178,187,244,254,255,258], #SWC_NM_018 16/6
-                                    [84,219],
+                                    # [84,219], #SWC_NM_018 17/6
                                     [], #96
                                     [], #96
                                     [], #96
                                     [], #96
-                                    [], #97
+                                    # [], #97
                                     []] #97
 
 pids_list_ZI = ['0022179b-0101-48b0-b60f-c5de8ed3761d', 'ccfb329e-c3b0-43be-9710-5d7c8ee968d2',  #SWC_NM_020 22/3/22, #SWC_NM_020 23/3/22 (mostly ZI/thal, but also lots of MB units)

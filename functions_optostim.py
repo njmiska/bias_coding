@@ -8,6 +8,8 @@ from scipy import stats
 from scipy.stats import ranksums
 from statsmodels.stats.multitest import multipletests
 import statistics
+from scipy.stats import spearmanr
+
 
 
 def signed_contrast(trials):
@@ -784,3 +786,41 @@ def isbiasblockselective_perm_vector(
 
     return (isbias, p_empirical, pval_real, stat_real, stat_pseudo,
             fr_80_nonstim, fr_20_nonstim, fr_80_inhib, fr_20_inhib)
+
+
+def get_drift_indices(X, block, drift_threshold=0.4):
+    """
+    Identifies neurons where firing rate correlates stronger with time (drift)
+    than with the block structure.
+    
+    X: (n_trials, n_time, n_neurons)
+    block: (n_trials,) boolean or int array of block identity
+    drift_threshold: correlation with time above which a unit is suspect
+    """
+    # 1. Get mean firing rate per trial for every neuron
+    # Shape: (n_trials, n_neurons)
+    fr_per_trial = np.mean(X, axis=1) 
+    
+    n_neurons = X.shape[2]
+    trial_indices = np.arange(X.shape[0])
+    
+    drift_unit_ids = []
+    
+    for i in range(n_neurons):
+        fr = fr_per_trial[:, i]
+        
+        # 2. Correlate FR with Time (Trial Number)
+        # We use Spearman because drift isn't always perfectly linear
+        rho_time, _ = spearmanr(fr, trial_indices)
+        
+        # 3. Correlate FR with Block Identity
+        rho_block, _ = spearmanr(fr, block)
+        
+        # 4. Decision Rule:
+        # If the unit is highly correlated with time...
+        if abs(rho_time) > drift_threshold:
+            # ...AND it is MORE correlated with time than with the block
+            if abs(rho_time) > abs(rho_block):
+                drift_unit_ids.append(i)
+                
+    return np.array(drift_unit_ids)

@@ -32,7 +32,7 @@ from metadata_opto_allsessions_B import sessions, find_sessions_by_advanced_crit
 
 
 # GLM-HMM SETTINGS
-n_states = 4
+n_states = 2
 state_type = 'engaged' # 'disengaged' #'engaged' #'bypass'
 state_def = 'current' # 'current'
 
@@ -42,26 +42,27 @@ eids, trials_ranges, MouseIDs, stim_params = find_sessions_by_advanced_criteria(
     sessions, 
     # EID = lambda x: x in ['363fb0df-7564-40d2-9fa1-d151a7b7d5b0',],
     # EID = lambda x: x in ['4801a128-66ae-4849-8611-65e71a19fd3b'],
-    # Mouse_ID = 'SWC_NM_098',
+    # Mouse_ID = 'SWC_NM_080',
     # Mouse_ID = lambda x: x in ['SWC_AY_002', 'SWC_AY_008', 'SWC_AY_006', 'SWC_AY_010', 'SWC_AY_012'],
     # Mouse_ID = lambda x: x in ['SWC_NM_072', 'SWC_NM_071', 'SWC_NM_057', 'SWC_NM_058', 'SWC_NM_081', 'SWC_NM_082', 'SWC_NM_085', 'SWC_NM_086', 'SWC_NM_090', 'SWC_NM_091'], ### zapit
     # Mouse_ID = lambda x: x in ['SWC_NM_087', 'SWC_NM_065', 'SWC_NM_043'], #### VLS D2 ###SWC_NM_042
-    Mouse_ID = lambda x: x in ['SWC_NM_053', 'SWC_NM_073', 'SWC_NM_093', 'SWC_NM_098', 'SWC_NM_099', 'SWC_NM_100'], #### VLS D1 ###'SWC_NM_038'
-    # Mouse_ID = lambda x: x in ['SWC_NM_004', 'SWC_NM_008', 'SWC_NM_011', 'SWC_NM_012', 'SWC_NM_018', 'SWC_NM_016', 'SWC_NM_080'], # current SNr mice
+    # Mouse_ID = lambda x: x in ['SWC_NM_053', 'SWC_NM_073', 'SWC_NM_093', 'SWC_NM_098', 'SWC_NM_099', 'SWC_NM_100'], #### VLS D1 ###'SWC_NM_038'
+    Mouse_ID = lambda x: x in ['SWC_NM_004', 'SWC_NM_008', 'SWC_NM_011', 'SWC_NM_012', 'SWC_NM_018', 'SWC_NM_016', 'SWC_NM_080', 'SWC_NM_102'], # current SNr mice
     # Mouse_ID = lambda x: x in ['SWC_NM_024', 'SWC_NM_025', 'SWC_NM_026'], # current STN mice
     # Mouse_ID = lambda x: x in ['SWC_NM_003', 'SWC_NM_010', 'SWC_NM_022'], # current ZI mice
     # Date = '060324',
     # Hemisphere = 'both',
+    # Hemisphere = lambda x: x in ['both', 'right'],
     # Opsin=lambda x: x in ['GtACR2', 'ChR2'],
     # Opsin='GtACR2',
     # Stimulation_Params ='zapit',
-    Stimulation_Params = 'QPRE',
-    # Stimulation_Params = lambda x: x in ['QPRE', 'QPRE*'],
-    Pulse_Params = '50hz', 
+    # Stimulation_Params = 'QPRE',
+    Stimulation_Params = lambda x: x in ['QPRE', 'QPRE*'],
+    Pulse_Params = 'cont', 
     # Pulse_Params = 'motor_bilateral_mask', 
     # Pulse_Params = lambda x: x in ['50hz', '20hz', 'cont_c'],
-    # Laser_V = '0.7',
-    # Laser_V = lambda x: x in ['0.5', '0.7', '0.8', '0.9', '1'],
+    # Laser_V = 0.7,
+    # Laser_V = lambda x: x in [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
     # Genetic_Line = 'D1-Cre',
     # Brain_Region = 'motor_bilateral',
     # Brain_Region = 'SNr',
@@ -90,10 +91,13 @@ with open("/Users/natemiska/int-brain-lab/GLM-HMM/disengaged_prevtrial_indices.p
 
 ############### OPTIONS ####################
 is_zapit_session = 0
-BL_perf_thresh = 0
-stim_perf_thresh = 0
-# BL_perf_thresh = 0.2 #0.79    ## 
-# stim_perf_thresh = 0 #0.5      ## performance threshold for opto stim ON trials 
+
+BL_perf_thresh = 0#0.6
+#### Remove sessions in which EITHER left or right high contrast trials are below X accuracy; now works with GLM-HMM
+
+stim_perf_thresh = 0#0.5
+#### Remove sessions in which EITHER left or right high contrast STIM trials are below X accuracy; now works with GLM-HMM
+
 min_num_trials = 0 #300
 min_bias_threshold = 0.5 #0.5 #0.75
 min_bias_threshold_zapit = 1 #1.5
@@ -106,9 +110,9 @@ use_trials_after_stim = 0
 subsample_trials_after_stim = 0
 
 plot_for_paper = 1 ### plots are in paper format
-save_figures = 1 # 0: save figure = false; 1: save figure = true
-figure_save_path = '/Users/natemiska/Documents/Lab_Data/Meeting_14_10_25/'
-figure_prefix = 'D1_ALL'
+save_figures = 0 # 0: save figure = false; 1: save figure = true
+figure_save_path = '/Users/natemiska/Documents/Lab_Data/LabMeetingDec2025/Zapit_GLM_HMM'
+figure_prefix = 'ALL_ZAPIT'
 
 ############## WHEEL OPTIONS ##############
 
@@ -135,8 +139,148 @@ later_trials_start = 0
 only_analyze_trials_x_after_stim = 0 #for removing simply x trials immediately after start of stim
 
 
-##################### MAIN LOOP ##########################
+##################### FUNCTIONS ##########################
+import copy
+from typing import Any, List, Dict # Assuming these types are available
+# --- FIX 1: BUNCH SUBSETTING ---
+def subset_bunch(bunch_obj: Any, indices: Any) -> Any:
+    """
+    Creates a new Bunch object by slicing all trial-length attributes 
+    using a slice object or index array.
+    """
+    # Create a shallow copy to hold the sliced data
+    new_bunch = copy.copy(bunch_obj)
+    
+    # Iterate over all attributes (keys) in the Bunch object
+    for k in list(new_bunch.__dict__.keys()):
+        arr = new_bunch.__dict__[k]
+        
+        # Check 1: Must be a NumPy array
+        # Check 2: Must be large enough (>10 elements) to likely be trial data, not metadata
+        if isinstance(arr, np.ndarray) and arr.ndim > 0 and arr.shape[0] > 10:
+            try:
+                # Attempt the slice operation. If 'indices' is a slice object, this works fine.
+                new_bunch.__dict__[k] = arr[indices]
+            except IndexError:
+                # If the slice is out of bounds (e.g., slicing a small metadata array that 
+                # somehow met the size threshold), we safely skip it.
+                pass
+            except TypeError:
+                # Catch any remaining unexpected type issues and skip.
+                pass
+        
+    return new_bunch
 
+# --- FIX 2: ACCURACY CALCULATION ---
+def calculate_accuracy_hc(trials_bunch, mask_hc) -> float:
+    """Calculates accuracy (proportion correct) from trials.feedbackType for a masked subset."""
+    
+    # Filter the feedback types using the high-contrast mask
+    feedback = trials_bunch.feedbackType[mask_hc]
+    
+    # feedbackType is typically +1 for correct, -1 for incorrect.
+    # Accuracy = number of correct trials / total trials
+    # Correct trials are where feedbackType == 1
+    
+    n_trials = len(feedback)
+    if n_trials == 0:
+        return np.nan
+        
+    n_correct = np.sum(feedback == 1)
+    
+    return n_correct / n_trials
+
+
+def organize_psychodata(trials_bunch, contrast_array):
+    data = {}
+    for pL in np.unique(trials_bunch.probabilityLeft):
+        in_block = trials_bunch.probabilityLeft == pL
+        # Use the contrast array aligned to the trials subset
+        xx, nn = np.unique(contrast_array[in_block], return_counts=True)
+        rightward = trials_bunch.choice == -1
+        # Calculate proportion rightward for each contrast/block pair
+        pp = np.array([np.mean(rightward[(x == contrast_array) & in_block]) for x in xx])
+        data[pL] = np.vstack((xx, nn, pp))
+    return data
+
+
+def fit_and_extract_bias_shift(data):
+    fits = {}
+    for pL, da in data.items():
+        if da.shape[1] < 2: continue # Skip if not enough contrasts
+        pars, L = psy.mle_fit_psycho(da, 'erf_psycho_2gammas', **kwargs)
+        fits[pL] = pars
+
+    if 0.8 in fits and 0.2 in fits:
+        # Use specific contrast points from the original script (0, 6, 12.5, 25, 100)
+        contrasts_all = np.array([-100., -25., 100., 25.]) # High Contrast used in your original loop
+        contrasts_lc  = np.array([0., -12.5, 12.5, -6.25, 6.25]) # Low Contrast
+
+        # ALL CONTRASTS: Summing the difference for HC points (as per your original script logic)
+        bias_shift_all = 0.0
+        for c in contrasts_all:
+            bias_20 = psy.erf_psycho_2gammas(fits[0.2], c)
+            bias_80 = psy.erf_psycho_2gammas(fits[0.8], c)
+            bias_shift_all += (bias_20 - bias_80)
+            
+        # LOW CONTRASTS: Summing the difference for LC points (as per your original script logic)
+        bias_shift_lc = 0.0
+        for c in contrasts_lc:
+            bias_20 = psy.erf_psycho_2gammas(fits[0.2], c)
+            bias_80 = psy.erf_psycho_2gammas(fits[0.8], c)
+            bias_shift_lc += (bias_20 - bias_80)
+        
+        return bias_shift_all, bias_shift_lc
+    return np.nan, np.nan
+
+import copy
+import numpy as np
+
+def slice_bunch(bunch_obj, indices):
+    """
+    Creates a new Bunch containing only the data at the given indices 
+    for all array-like attributes.
+    """
+    new_bunch = copy.copy(bunch_obj)
+    # We iterate over the object's directory to find attributes
+    attributes = [attr for attr in dir(bunch_obj) if not attr.startswith('__')]
+    
+    for attr in attributes:
+        val = getattr(bunch_obj, attr)
+        # Check if it's a numpy array and has the same length as the trials object
+        # (Using a heuristic that trial data usually has length > 10)
+        if isinstance(val, np.ndarray) and len(val) > 10: 
+            try:
+                # Apply the mask/indices
+                setattr(new_bunch, attr, val[indices])
+            except (IndexError, TypeError):
+                # If indexing fails (e.g. metadata attribute), keep original
+                pass
+    return new_bunch
+
+def concat_bunches(bunch1, bunch2):
+    """
+    Concatenates two Bunch objects by appending arrays in bunch2 to bunch1.
+    """
+    if bunch1 is None: return bunch2
+    if bunch2 is None: return bunch1
+    
+    merged = copy.copy(bunch1)
+    attributes = [attr for attr in dir(bunch1) if not attr.startswith('__')]
+    
+    for attr in attributes:
+        val1 = getattr(bunch1, attr)
+        if hasattr(bunch2, attr):
+            val2 = getattr(bunch2, attr)
+            if isinstance(val1, np.ndarray) and isinstance(val2, np.ndarray):
+                try:
+                    # Concatenate the arrays
+                    setattr(merged, attr, np.concatenate((val1, val2)))
+                except ValueError:
+                    pass
+    return merged
+
+##################### MAIN LOOP ##########################
 ### for concatenating zapit data; will need to change number for different stims
 num_stim_locations = 52
 
@@ -195,986 +339,612 @@ stim_sumall_difference[:] = np.nan
 nonstim_sumall_difference = np.empty([np.size(eids)])
 nonstim_sumall_difference[:] = np.nan
 deviation = [] 
-for j in range(103,np.size(eids)):
+MouseIDs_used_for_final_analysis = []
+EIDs_used_for_final_analysis = []
+nonstim_trials_added_per_session = []
+stim_trials_added_per_session = []
+mouse_trials_container = {}
+for j in range(0,np.size(eids)):
+    stim_trials_numbers = []
+    nonstim_trials_numbers = []
+    trials_range = []
+    dset = []
+    data_behav = []
+    trials = []
+    taskData = []
+    ses_path = ['not a session path']
 
+    # try:
+    eid = eids[j]
+
+    print('starting session, eid = ' + eid)
     try:
-        eid = eids[j]
+        trials = one.load_object(eid, 'trials')
 
-        print('starting session, eid = ' + eid)
+    except:
+        print('Failed to load eid = ' + eid)
+        #input("Press Enter to continue...")
+        continue
+
+    if is_zapit_session == 0:
         try:
-            trials = one.load_object(eid, 'trials')
-
+            try:
+                laser_intervals = one.load_dataset(eid, '_ibl_laserStimulation.intervals')
+            except:
+                try:
+                    laser_intervals = one.load_dataset(eid, '_ibl_laserStimulation.intervals', collection='alf')
+                except:
+                    laser_intervals = one.load_dataset(eid, '_ibl_laserStimulation.intervals', collection='alf/task00')
         except:
-            print('Failed to load eid = ' + eid)
-            #input("Press Enter to continue...")
+            print('Laser intervals data not found for eid = ' + eid + '. Utilizing depricated taskData...')
+            dset = '_iblrig_taskData.raw*'
+            data_behav = one.load_dataset(eid, dataset=dset, collection='raw_behavior_data')
+            ses_path = one.eid2path(eid)
+            taskData = load_data(ses_path) ##### FUCK THIS CAUSED MAJOR ISSUES DOWNSTREAM - KEEP AN EYE ON THIS
+
+    wheel = one.load_object(eid, 'wheel')
+    current_mouse_ID = MouseIDs[j]
+
+    if not is_eid_successful(state_probability, current_mouse_ID, eid):
+        print('No GLM-HMM states found for eid = ' + str(eid) + '! Skipping...')
+        continue  # Skip eid with failed glm-hmm sessions
+    
+
+    if is_zapit_session == 0:
+        reaction_times = np.empty([np.size(trials['contrastLeft'])])
+        reaction_times[:] = np.nan
+        quiescent_period_times = np.empty([np.size(trials['contrastLeft'])])
+        quiescent_period_times[:] = np.nan
+
+        for tr in range(len(trials['contrastLeft'])):
+            react = trials['feedback_times'][tr] - trials['goCue_times'][tr]
+            if react > 59.9:
+                # print('error')
+                continue
+            try:
+                trial_start_time = trials.intervals[tr,0]
+                stimOn_time = trials.goCue_times[tr]
+            except:
+                trial_start_time = taskData[tr]['behavior_data']['States timestamps']['trial_start'][0][0]
+                stimOn_time = taskData[tr]['behavior_data']['States timestamps']['stim_on'][0][0]
+
+            qp = stimOn_time - trial_start_time
+            reaction_times[tr] = react
+            quiescent_period_times[tr] = qp            
+
+        if num_analyzed_sessions == 0:
+
+            stim_trials = trials.copy()
+            nonstim_trials = trials.copy()
+
+        #### load trials range
+        stim_trials_numbers = np.full(len(trials['contrastLeft']), np.nan)
+        nonstim_trials_numbers = np.full(len(trials['contrastLeft']), np.nan)
+        if trials_ranges[j] == 'ALL':
+            trials_range = range(0,len(trials['contrastLeft']))
+        #### use last trial as end of range when end of range set to 9999
+        elif trials_ranges[j][-1] == 9998:
+            trials_range = [x for x in trials_ranges[j] if x < np.size(trials.probabilityLeft)]
+        else:
+            trials_range = trials_ranges[j]
+        if remove_trials_before > 0 and j < loop_threshold_for_remove:
+            trials_range = list(np.array(trials_range)[np.where(np.array(trials_range) > remove_trials_before)[0]])
+        if len(trials_range) < min_num_trials:
+            print('Not enough trials in ' + str(eid) + ' , skipping...')
             continue
 
-        if is_zapit_session == 0:
-            try:
-                dset = '_iblrig_taskData.raw*'
-                data_behav = one.load_dataset(eid, dataset=dset, collection='raw_behavior_data')
-                ses_path = one.eid2path(eid)
-            except:
-                print('Dataset "_iblrig_taskData.raw*.*" not found for eid = ' + eid + '. Utilizing laser intervals data...')
-                try:
-                    laser_intervals = one.load_dataset(eid, '_ibl_laserStimulation.intervals')
-                except:
-                    laser_intervals = one.load_dataset(eid, '_ibl_laserStimulation.intervals', collection='alf')
-        wheel = one.load_object(eid, 'wheel')
-        current_mouse_ID = MouseIDs[j]
+        ### 2 different ways to extract what trials were laser trials; old versus new
 
-        if not is_eid_successful(state_probability, current_mouse_ID, eid):
-            continue  # Skip eid with failed glm-hmm sessions
-        
+        try:
+            for k in trials_range:#range(0,len(trials.intervals)):
 
-        if is_zapit_session == 0:
-            reaction_times = np.empty([np.size(trials['contrastLeft'])])
-            reaction_times[:] = np.nan
-            quiescent_period_times = np.empty([np.size(trials['contrastLeft'])])
-            quiescent_period_times[:] = np.nan
+                if stim_params[j] == 'QPRE':
 
-            try:
-                taskData = load_data(ses_path) ###depricated
-            except:
-                print('no task data found...')
-            for tr in range(len(trials['contrastLeft'])):
-                react = trials['feedback_times'][tr] - trials['goCue_times'][tr]
-                if react > 59.9:
-                    # print('error')
-                    continue
-                try:
-                    trial_start_time = taskData[tr]['behavior_data']['States timestamps']['trial_start'][0][0]
-                    stimOn_time = taskData[tr]['behavior_data']['States timestamps']['stim_on'][0][0]
-                except:
-                    trial_start_time = trials.intervals[tr,0]
-                    stimOn_time = trials.goCue_times[tr]
-
-                qp = stimOn_time - trial_start_time
-                reaction_times[tr] = react
-                quiescent_period_times[tr] = qp            
-
-            if num_analyzed_sessions == 0:
-
-                stim_trials = trials.copy()
-                nonstim_trials = trials.copy()
-
-
-            stim_trials_numbers = np.full(len(trials['contrastLeft']), np.nan)
-            nonstim_trials_numbers = np.full(len(trials['contrastLeft']), np.nan)
-            if trials_ranges[j] == 'ALL':
-                trials_range = range(0,len(trials['contrastLeft']))
-            #### use last trial as end of range when end of range set to 9999
-            elif trials_ranges[j][-1] == 9998:
-                trials_range = [x for x in trials_ranges[j] if x < np.size(trials.probabilityLeft)]
-            else:
-                trials_range = trials_ranges[j]
-            if remove_trials_before > 0 and j < loop_threshold_for_remove:
-                trials_range = list(np.array(trials_range)[np.where(np.array(trials_range) > remove_trials_before)[0]])
-            if len(trials_range) < min_num_trials:
-                print('Not enough trials in ' + str(eid) + ' , skipping...')
-                continue
-
-
-            ##### GLM-HMMM #####
-            try: 
-                if state_def == 'current' and n_states == 2: 
-                    engaged_idx, disengaged_idx = get_glmhmm_indices(current_mouse_ID, eid, state_probability, n_states)
-
-                elif state_def == 'previous' and n_states == 2:
-                    # engaged_idx = engaged_indices[current_mouse_ID][eid]
-                    # disengaged_idx = disengaged_indices[current_mouse_ID][eid]
-                    engaged_idx, disengaged_idx = get_glmhmm_indices(current_mouse_ID, eid, state_probability, n_states)
-                    engaged_idx = engaged_idx + 1
-                    disengaged_idx = disengaged_idx + 1
-                elif state_def == 'current' and n_states == 4:
-                    state_1_idx, state_2_idx, state_3_idx, state_4_idx = get_glmhmm_indices(current_mouse_ID, eid, state_probability, n_states)
-                elif state_def == 'previous' and n_states == 4:
-                    state_1_idx, state_2_idx, state_3_idx, state_4_idx = get_glmhmm_indices(current_mouse_ID, eid, state_probability, n_states)
-                    state_1_idx = state_1_idx[0] + 1
-                    state_2_idx = state_2_idx[0] + 1
-                    state_3_idx = state_3_idx[0] + 1
-                    state_4_idx = state_4_idx[0] + 1
-                    
-            except:
-                print(f'no glm-hmm state labels found for eid: {eid}. skipping session...')
-                continue
-
-            ####################
-
-            if n_states == 2:
-                if state_type == 'engaged':
-                    trials_range = np.intersect1d(engaged_idx, trials_range)
-                elif state_type == 'disengaged':
-                    trials_range = np.intersect1d(disengaged_idx, trials_range)
-                elif state_type == 'bypass':
-                    trials_range = trials_range
-            else:
-                if state_type == 'state1':
-                    trials_range = np.intersect1d(state_1_idx, trials_range)
-                elif state_type == 'state2':
-                    trials_range = np.intersect1d(state_2_idx, trials_range)
-                elif state_type == 'state3':
-                    trials_range = np.intersect1d(state_3_idx, trials_range)
-                elif state_type == 'state4':
-                    trials_range = np.intersect1d(state_4_idx, trials_range)
-                elif state_type == 'engaged':
-                    indices = np.concatenate([state_1_idx[0], state_3_idx[0]])
-                    trials_range = np.intersect1d(indices, trials_range)
-                elif state_type == 'disengaged':
-                    indices = np.concatenate([state_2_idx[0], state_4_idx[0]])
-                    trials_range = np.intersect1d(indices, trials_range)
-                elif state_type == 'bypass':
-                    trials_range = trials_range
-
-            ### 2 different ways to extract what trials were laser trials; old versus new
-
-            try:
-                for k in trials_range:
-                    if taskData[k]['opto'] == 1:
+                    if trials.intervals[k,0] in laser_intervals[:,0]:
                         react = trials['feedback_times'][k] - trials['goCue_times'][k]
-                        if react < RT_threshold:
+                        if react < RT_threshold:  
                             stim_trials_numbers[k] = k
                     else:
                         react = trials['feedback_times'][k] - trials['goCue_times'][k]
                         if react < RT_threshold:
-                            nonstim_trials_numbers[k] = k    
-                                        
-            except:
-                laser_intervals = one.load_dataset(eid, '_ibl_laserStimulation.intervals')
-                for k in trials_range:#range(0,len(trials.intervals)):
+                            nonstim_trials_numbers[k] = k  
 
-                    if stim_params[j] == 'QPRE':
+                elif stim_params[j] == 'SORE':
 
-                        if trials.intervals[k,0] in laser_intervals[:,0]:
-                            react = trials['feedback_times'][k] - trials['goCue_times'][k]
-                            if react < RT_threshold:  
-                                stim_trials_numbers[k] = k
-                        else:
-                            react = trials['feedback_times'][k] - trials['goCue_times'][k]
-                            if react < RT_threshold:
-                                nonstim_trials_numbers[k] = k  
+                    start_trial = trials.intervals[k, 0]
+                    end_trial = trials.intervals[k, 1]
 
-                    elif stim_params[j] == 'SORE':
-
-                        start_trial = trials.intervals[k, 0]
-                        end_trial = trials.intervals[k, 1]
-
-                        if np.any((laser_intervals[:, 0] >= start_trial) & (laser_intervals[:, 0] <= end_trial)):
-                            react = trials['feedback_times'][k] - trials['goCue_times'][k]
-                            if react < RT_threshold:  
-                                stim_trials_numbers[k] = k
-                        else:
-                            react = trials['feedback_times'][k] - trials['goCue_times'][k]
-                            if react < RT_threshold:
-                                nonstim_trials_numbers[k] = k  
-
-            # if state_def == 'previous':                         # TO DO: account for trials where stim was on 2 trials in a row !!
-            #     prev_stim_trials_numbers = stim_trials_numbers -
-
-
-            ##############
-                                
-            # modified_stim_trials = stim_trials_numbers.copy()
-
-            # # Get indices of valid (non-NaN) values in nonstim_trials_numbers
-            # valid_nonstim = nonstim_trials_numbers[~np.isnan(nonstim_trials_numbers)]
-
-            # # Track the last found valid smaller value
-            # previous_valid = np.nan
-
-            # for i in range(len(stim_trials_numbers)):
-            #     if not np.isnan(stim_trials_numbers[i]):  # Only process non-NaN values
-            #         stim_value = stim_trials_numbers[i]
-
-            #         # Find the nearest smaller and larger values
-            #         smaller_values = valid_nonstim[valid_nonstim < stim_value]
-            #         larger_values = valid_nonstim[valid_nonstim > stim_value]
-
-            #         nearest_smaller = np.max(smaller_values) if smaller_values.size > 0 else np.nan
-            #         nearest_larger = np.min(larger_values) if larger_values.size > 0 else np.nan
-
-            #         # Determine which to use
-            #         if not np.isnan(nearest_smaller) and abs(stim_value - nearest_smaller) <= 10:
-            #             assigned_value = nearest_smaller  # Use nearest smaller if within 10
-            #         elif not np.isnan(nearest_larger):  
-            #             assigned_value = nearest_larger  # Otherwise, use nearest larger
-            #         else:
-            #             assigned_value = np.nan  # If nothing is found, keep NaN
-
-            #         # Assign value if valid
-            #         if not np.isnan(assigned_value):
-            #             modified_stim_trials[i] = assigned_value
-
-                
-
-            #### TEST (^^) ####
-
-            trials_numbers = np.concatenate((nonstim_trials_numbers,stim_trials_numbers))
-            trials_numbers = trials_numbers[~np.isnan(trials_numbers)]
-            stim_trials_numbers = stim_trials_numbers[~np.isnan(stim_trials_numbers)]
-            nonstim_trials_numbers = nonstim_trials_numbers[~np.isnan(nonstim_trials_numbers)]
-            stim_trials_numbers = stim_trials_numbers.astype(int)
-            nonstim_trials_numbers = nonstim_trials_numbers.astype(int)
-            trials_numbers = trials_numbers.astype(int)
-            if only_include_bias_trials == 1:
-                stim_trials_numbers = stim_trials_numbers[stim_trials_numbers>89]
-                nonstim_trials_numbers = nonstim_trials_numbers[nonstim_trials_numbers>89]
-                trials_numbers = trials_numbers[trials_numbers>89]
-            if use_trials_after_stim == 1:
-                for l in range(len(stim_trials_numbers)): 
-                    if l == len(stim_trials_numbers) - 1: 
-                        if stim_trials_numbers[l] > nonstim_trials_numbers[len(nonstim_trials_numbers) - 1]:
-                            stim_trials_numbers[l] = 9999
-                            continue
-                        else:
-                            stim_trials_numbers[l] = stim_trials_numbers[l] + 1
+                    if np.any((laser_intervals[:, 0] >= start_trial) & (laser_intervals[:, 0] <= end_trial)):
+                        react = trials['feedback_times'][k] - trials['goCue_times'][k]
+                        if react < RT_threshold:  
+                            stim_trials_numbers[k] = k
                     else:
-                        if stim_trials_numbers[l+1] - stim_trials_numbers[l] == 1:
-                            stim_trials_numbers[l] = 9999
-                            continue
-                        else:
-                            stim_trials_numbers[l] = stim_trials_numbers[l] + 1
-
-            stim_trials_numbers = stim_trials_numbers[stim_trials_numbers!=9999]
-            rt_stimtrials = reaction_times[stim_trials_numbers]
-            qp_stimtrials = quiescent_period_times[stim_trials_numbers]
-            rt_nonstimtrials = reaction_times[nonstim_trials_numbers]
-            qp_nonstimtrials = quiescent_period_times[nonstim_trials_numbers]
-
-            ### remove all "stim" trials from nonstim trials
-            nonstim_trials_numbers = np.setdiff1d(nonstim_trials_numbers, stim_trials_numbers)
-
-            #for subsampling, maybe check on each iteration here if # L&R trials in each block is equal
-            #alternatively, can take randomly equal number of trials from each and pool them together
-            #ie, make 2 groups each block, RstimRblock, LstimRblock, LstimLblock, and RstimLblock
-            #and subsample randomly equal amount of each for each block
-            if subsample_trials_after_stim:
-                Rblock_inds_stim = stim_trials_numbers[np.where(trials.probabilityLeft[stim_trials_numbers] == 0.2)[0]]
-                Lblock_inds_stim = stim_trials_numbers[np.where(trials.probabilityLeft[stim_trials_numbers] == 0.8)[0]]
-                PrevLchoice_inds_stim = stim_trials_numbers[np.where(trials.choice[stim_trials_numbers-1] == -1)[0]]
-                PrevRchoice_inds_stim = stim_trials_numbers[np.where(trials.choice[stim_trials_numbers-1] == 1)[0]]
-                ind_Lblock_Lprevchoice_stim = np.intersect1d(Lblock_inds_stim,PrevLchoice_inds_stim)
-                ind_Lblock_Rprevchoice_stim = np.intersect1d(Lblock_inds_stim,PrevRchoice_inds_stim)
-                ind_Rblock_Lprevchoice_stim = np.intersect1d(Rblock_inds_stim,PrevLchoice_inds_stim)
-                ind_Rblock_Rprevchoice_stim = np.intersect1d(Rblock_inds_stim,PrevRchoice_inds_stim)
-
-                if len(ind_Lblock_Lprevchoice_stim) > len(ind_Lblock_Rprevchoice_stim):
-                    subsample_indices_toremove_A = random.sample(list(ind_Lblock_Lprevchoice_stim), len(ind_Lblock_Lprevchoice_stim) - len(ind_Lblock_Rprevchoice_stim))
-                elif len(ind_Lblock_Lprevchoice_stim) < len(ind_Lblock_Rprevchoice_stim):
-                    subsample_indices_toremove_A = random.sample(list(ind_Lblock_Rprevchoice_stim), len(ind_Lblock_Rprevchoice_stim) - len(ind_Lblock_Lprevchoice_stim))
-
-                if len(ind_Rblock_Lprevchoice_stim) > len(ind_Rblock_Rprevchoice_stim):
-                    subsample_indices_toremove_B = random.sample(list(ind_Rblock_Lprevchoice_stim), len(ind_Rblock_Lprevchoice_stim) - len(ind_Rblock_Rprevchoice_stim))
-                elif len(ind_Rblock_Lprevchoice_stim) < len(ind_Rblock_Rprevchoice_stim):
-                    subsample_indices_toremove_B = random.sample(list(ind_Rblock_Rprevchoice_stim), len(ind_Rblock_Rprevchoice_stim) - len(ind_Rblock_Lprevchoice_stim))
-
-                subsample_indices_toremove = np.concatenate([subsample_indices_toremove_A,subsample_indices_toremove_B])
-                # stim_trials_numbers_test = stim_trials_numbers
-                for k in subsample_indices_toremove:
-                    # stim_trials_numbers_test = np.delete(stim_trials_numbers_test, np.where(stim_trials_numbers_test == k))
-                    stim_trials_numbers = np.delete(stim_trials_numbers, np.where(stim_trials_numbers == k))
-
-            ###for quantifying ipsi/contraversive turns
-            # Calculate bias index 
-            nonstim_direction = trials.choice[nonstim_trials_numbers]
-            nonstim_leftward = np.sum(nonstim_direction == 1)
-            nonstim_rightward = np.sum(nonstim_direction == -1)
-            nonstim_bias = (nonstim_rightward - nonstim_leftward) / len(nonstim_direction)
-
-            stim_direction = trials.choice[stim_trials_numbers]
-            stim_leftward = np.sum(stim_direction == 1)
-            stim_rightward = np.sum(stim_direction == -1)
-            stim_bias = (stim_rightward - stim_leftward) / len(stim_direction)
-
-            # Effect size
-            deviation.append(stim_bias - nonstim_bias) 
-
-
-            ###for estimating bias shift
-            stim_trials_temp = trials.copy()
-            nonstim_trials_temp = trials.copy()
-            stim_trials_temp.contrastRight = trials.contrastRight[stim_trials_numbers]
-            stim_trials_temp.contrastLeft = trials.contrastLeft[stim_trials_numbers]
-            stim_trials_temp.goCueTrigger_times = trials.goCueTrigger_times[stim_trials_numbers]
-            stim_trials_temp.feedback_times = trials.feedback_times[stim_trials_numbers]
-            stim_trials_temp.response_times = trials.response_times[stim_trials_numbers]
-            stim_trials_temp.feedbackType = trials.feedbackType[stim_trials_numbers]
-            stim_trials_temp.goCue_times = trials.goCue_times[stim_trials_numbers]
-            stim_trials_temp.firstMovement_times = trials.firstMovement_times[stim_trials_numbers]
-            stim_trials_temp.probabilityLeft = trials.probabilityLeft[stim_trials_numbers]
-            stim_trials_temp.stimOn_times = trials.stimOn_times[stim_trials_numbers]
-            stim_trials_temp.choice = trials.choice[stim_trials_numbers]
-            stim_trials_temp.prev_choice = trials.choice[stim_trials_numbers-1]
-            stim_trials_temp.rewardVolume = trials.rewardVolume[stim_trials_numbers]
-            stim_trials_temp.intervals = trials.intervals[stim_trials_numbers]
-            nonstim_trials_temp.contrastRight = trials.contrastRight[nonstim_trials_numbers]
-            nonstim_trials_temp.contrastLeft = trials.contrastLeft[nonstim_trials_numbers]
-            nonstim_trials_temp.goCueTrigger_times = trials.goCueTrigger_times[nonstim_trials_numbers]
-            nonstim_trials_temp.feedback_times = trials.feedback_times[nonstim_trials_numbers]
-            nonstim_trials_temp.response_times = trials.response_times[nonstim_trials_numbers]
-            nonstim_trials_temp.feedbackType = trials.feedbackType[nonstim_trials_numbers]
-            nonstim_trials_temp.goCue_times = trials.goCue_times[nonstim_trials_numbers]
-            nonstim_trials_temp.firstMovement_times = trials.firstMovement_times[nonstim_trials_numbers]
-            nonstim_trials_temp.probabilityLeft = trials.probabilityLeft[nonstim_trials_numbers]
-            nonstim_trials_temp.stimOn_times = trials.stimOn_times[nonstim_trials_numbers]
-            nonstim_trials_temp.choice = trials.choice[nonstim_trials_numbers]
-            nonstim_trials_temp.prev_choice = trials.choice[nonstim_trials_numbers-1]
-            nonstim_trials_temp.rewardVolume = trials.rewardVolume[nonstim_trials_numbers]
-            nonstim_trials_temp.intervals = trials.intervals[nonstim_trials_numbers]
-            stim_trials_temp_contrast = signed_contrast(stim_trials_temp)
-            nonstim_trials_temp_contrast = signed_contrast(nonstim_trials_temp)
-
-            nonstim_trialnums_HCR = np.where(nonstim_trials_temp_contrast == 100)[0]
-            nonstim_trialnums_HCL = np.where(nonstim_trials_temp_contrast == -100)[0]
-            num_correct_HCR = np.sum(nonstim_trials_temp.rewardVolume[nonstim_trialnums_HCR])/1.5
-            num_correct_HCL = np.sum(nonstim_trials_temp.rewardVolume[nonstim_trialnums_HCL])/1.5
-
-            stim_trialnums_HCR = np.where(stim_trials_temp_contrast == 100)[0]
-            stim_trialnums_HCL = np.where(stim_trials_temp_contrast == -100)[0]
-            stim_num_correct_HCR = np.sum(stim_trials_temp.rewardVolume[stim_trialnums_HCR])/1.5
-            stim_num_correct_HCL = np.sum(stim_trials_temp.rewardVolume[stim_trialnums_HCL])/1.5
-
-            all_signed_contrast = signed_contrast(trials)
-            abs_signed_contrast = abs(all_signed_contrast)
-
-            low_contrast_trials_bool_all = abs_signed_contrast < low_contrast_threshold
-
-            if num_correct_HCR/np.size(nonstim_trialnums_HCR) < BL_perf_thresh or num_correct_HCL/np.size(nonstim_trialnums_HCL) < BL_perf_thresh:
-                print(eid + ' below performance threshold, excluding...')
-                continue
-            if stim_num_correct_HCR/np.size(stim_trialnums_HCR) < stim_perf_thresh or stim_num_correct_HCL/np.size(stim_trialnums_HCL) < stim_perf_thresh:
-                print(eid + ' below performance threshold, excluding...')
-                continue
-
-            #waitforbuttonpress
-
-            ### for evaluating accuracy at low contrasts in stim vs nonstim conditions
-            ### n = sessions
-            ### currently, low contrasts == 0
-            low_contrast_indices_stim = np.where(stim_trials_temp_contrast < 1)[0]
-            low_contrast_indices_nonstim = np.where(nonstim_trials_temp_contrast < 1)[0]
-            correct_indices_lowcontrast_stim = np.where(stim_trials_temp.feedbackType[low_contrast_indices_stim] == 1)[0]
-            correct_indices_lowcontrast_nonstim = np.where(nonstim_trials_temp.feedbackType[low_contrast_indices_nonstim] == 1)[0]
-            accuracy_lowcontrast_stim[j] = len(correct_indices_lowcontrast_stim)/len(low_contrast_indices_stim)
-            accuracy_lowcontrast_nonstim[j] = len(correct_indices_lowcontrast_nonstim)/len(low_contrast_indices_nonstim)
-
-            stim_trials_data = {}
-            for pL in np.unique(stim_trials_temp.probabilityLeft):
-                in_block = stim_trials_temp.probabilityLeft == pL
-                xx, nn = np.unique(stim_trials_temp_contrast[in_block], return_counts=True)
-                rightward = stim_trials_temp.choice == -1
-                pp = np.vectorize(lambda x: np.mean(rightward[(x == stim_trials_temp_contrast) & in_block]))(xx)
-                stim_trials_data[pL] = np.vstack((xx, nn, pp))
-
-            nonstim_trials_data = {}
-            for pL in np.unique(nonstim_trials_temp.probabilityLeft):
-                in_block = nonstim_trials_temp.probabilityLeft == pL
-                xx, nn = np.unique(nonstim_trials_temp_contrast[in_block], return_counts=True)
-                rightward = nonstim_trials_temp.choice == -1
-                pp = np.vectorize(lambda x: np.mean(rightward[(x == nonstim_trials_temp_contrast) & in_block]))(xx)
-                nonstim_trials_data[pL] = np.vstack((xx, nn, pp))
-
-            kwargs = {                                                                      # CONTROLS PSYCHOMETRIC FIT
-                # parmin: The minimum allowable parameter values, in the form
-                # [bias, threshold, lapse_low, lapse_high]
-                'parmin': np.array([-25., 10., 0., 0.]),
-                # parmax: The maximum allowable parameter values
-                'parmax': np.array([100, 100., 1, 1]),
-                # Non-zero starting parameters, used to try to avoid local minima
-                'parstart': np.array([0., 40., .1, .1]),
-                # nfits: The number of fits to run
-                'nfits': 50
-            }
-            kwargs['parmin'][0] = -50.
-            kwargs['parmax'][0] = 50.
-
-            # For each block type, fit the data separately and plot
-            for pL, da in nonstim_trials_data.items():
-                # Fit it
-                pars, L = psy.mle_fit_psycho(da, 'erf_psycho_2gammas', **kwargs); 
-
-                if pL == 0.8:
-                    bias_80_value0 = psy.erf_psycho_2gammas(pars, 0)
-                    bias_80_valuen100 = psy.erf_psycho_2gammas(pars, -100)
-                    bias_80_valuen25 = psy.erf_psycho_2gammas(pars, -25)
-                    bias_80_valuen12 = psy.erf_psycho_2gammas(pars, -12)
-                    bias_80_valuen6 = psy.erf_psycho_2gammas(pars, -6)
-                    bias_80_value100 = psy.erf_psycho_2gammas(pars, 100)
-                    bias_80_value25 = psy.erf_psycho_2gammas(pars, 25)
-                    bias_80_value12 = psy.erf_psycho_2gammas(pars, 12)
-                    bias_80_value6 = psy.erf_psycho_2gammas(pars, 6)
-
-                if pL == 0.2:
-                    bias_20_value0 = psy.erf_psycho_2gammas(pars, 0)
-                    bias_20_valuen100 = psy.erf_psycho_2gammas(pars, -100)
-                    bias_20_valuen25 = psy.erf_psycho_2gammas(pars, -25)
-                    bias_20_valuen12 = psy.erf_psycho_2gammas(pars, -12)
-                    bias_20_valuen6 = psy.erf_psycho_2gammas(pars, -6)
-                    bias_20_value100 = psy.erf_psycho_2gammas(pars, 100)
-                    bias_20_value25 = psy.erf_psycho_2gammas(pars, 25)
-                    bias_20_value12 = psy.erf_psycho_2gammas(pars, 12)
-                    bias_20_value6 = psy.erf_psycho_2gammas(pars, 6)
-
-
-            bias_shift0 = bias_20_value0 - bias_80_value0
-            bias_shiftn100 = bias_20_valuen100 - bias_80_valuen100
-            bias_shiftn25 = bias_20_valuen25 - bias_80_valuen25
-            bias_shiftn12 = bias_20_valuen12 - bias_80_valuen12
-            bias_shiftn6 = bias_20_valuen6 - bias_80_valuen6
-            bias_shift100 = bias_20_value100 - bias_80_value100
-            bias_shift25 = bias_20_value25 - bias_80_value25
-            bias_shift12 = bias_20_value12 - bias_80_value12
-            bias_shift6 = bias_20_value6 - bias_80_value6
-            bias_shift_sum_all_temp = sum([bias_shift0,bias_shiftn100,bias_shiftn25,bias_shiftn12,bias_shiftn6,bias_shift100,bias_shift25,bias_shift12,bias_shift6])
-            if bias_shift_sum_all_temp < min_bias_threshold:
-                print(eid + ' below minimum baseline bias threshold, excluding...')
-                continue
-
-            ## CHANGE HERE TO SWITCH between all vs low stim comparison --> high vs low stim
-            bias_shift_sum_all_nonstim[j] = sum([bias_shiftn100,bias_shift100,bias_shiftn25,bias_shift25]) #bias_shift_sum_all_temp
-            bias_shift_sum_all_nonstim_LC[j] = sum([bias_shift0,bias_shiftn12,bias_shiftn6,bias_shift12,bias_shift6])
-            bias_shift0_all_nonstim[j] = bias_shift0
-            bias_shift_sum_all_nonstim_LEFT[j] = sum([bias_shiftn100,bias_shiftn25]) #sum([bias_shift0,bias_shiftn100,bias_shiftn25,bias_shiftn12,bias_shiftn6])
-            bias_shift_sum_all_nonstim_RIGHT[j] = sum([bias_shift100,bias_shift25]) #sum([bias_shift0,bias_shift100,bias_shift25,bias_shift12,bias_shift6])
-
-            #     pval_all = stats.ttest_rel(bias_shift_sum_all_nonstim,bias_shift_sum_all)
-
-            for pL, da in stim_trials_data.items():
-                # Fit it
-                pars, L = psy.mle_fit_psycho(da, 'erf_psycho_2gammas', **kwargs);
-
-                if pL == 0.8:
-                    bias_80_value0 = psy.erf_psycho_2gammas(pars, 0)
-                    bias_80_valuen100 = psy.erf_psycho_2gammas(pars, -100)
-                    bias_80_valuen25 = psy.erf_psycho_2gammas(pars, -25)
-                    bias_80_valuen12 = psy.erf_psycho_2gammas(pars, -12)
-                    bias_80_valuen6 = psy.erf_psycho_2gammas(pars, -6)
-                    bias_80_value100 = psy.erf_psycho_2gammas(pars, 100)
-                    bias_80_value25 = psy.erf_psycho_2gammas(pars, 25)
-                    bias_80_value12 = psy.erf_psycho_2gammas(pars, 12)
-                    bias_80_value6 = psy.erf_psycho_2gammas(pars, 6)
-
-                if pL == 0.2:
-                    bias_20_value0 = psy.erf_psycho_2gammas(pars, 0)
-                    bias_20_valuen100 = psy.erf_psycho_2gammas(pars, -100)
-                    bias_20_valuen25 = psy.erf_psycho_2gammas(pars, -25)
-                    bias_20_valuen12 = psy.erf_psycho_2gammas(pars, -12)
-                    bias_20_valuen6 = psy.erf_psycho_2gammas(pars, -6)
-                    bias_20_value100 = psy.erf_psycho_2gammas(pars, 100)
-                    bias_20_value25 = psy.erf_psycho_2gammas(pars, 25)
-                    bias_20_value12 = psy.erf_psycho_2gammas(pars, 12)
-                    bias_20_value6 = psy.erf_psycho_2gammas(pars, 6)
-
-
-            bias_shift0 = bias_20_value0 - bias_80_value0
-            bias_shiftn100 = bias_20_valuen100 - bias_80_valuen100
-            bias_shiftn25 = bias_20_valuen25 - bias_80_valuen25
-            bias_shiftn12 = bias_20_valuen12 - bias_80_valuen12
-            bias_shiftn6 = bias_20_valuen6 - bias_80_valuen6
-            bias_shift100 = bias_20_value100 - bias_80_value100
-            bias_shift25 = bias_20_value25 - bias_80_value25
-            bias_shift12 = bias_20_value12 - bias_80_value12
-            bias_shift6 = bias_20_value6 - bias_80_value6
-
-            # ALSO CHANGE HERE TO SWITCH BETWEEN ALL AND HIGH CONTRAST COMPARISONS
-            bias_shift_sum_all[j] = sum([bias_shiftn100,bias_shift100,bias_shiftn25,bias_shift25]) #sum([bias_shift0,bias_shiftn100,bias_shiftn25,bias_shiftn12,bias_shiftn6,bias_shift100,bias_shift25,bias_shift12,bias_shift6])
-            bias_shift_sum_all_LC[j] = sum([bias_shift0,bias_shiftn12,bias_shiftn6,bias_shift12,bias_shift6])
-            bias_shift0_all_stim[j] = bias_shift0
-            bias_shift_sum_all_LEFT[j] = sum([bias_shiftn100,bias_shiftn25]) #sum([bias_shift0,bias_shiftn100,bias_shiftn25,bias_shiftn12,bias_shiftn6])
-            bias_shift_sum_all_RIGHT[j] = sum([bias_shift100,bias_shift25]) #sum([bias_shift0,bias_shift100,bias_shift25,bias_shift12,bias_shift6])
-
-            #############################################################
-            ##### Load wheel data
-            if use_trials_after_stim == 0: ##wheel analysis not currently set up for stim+1 condition
-                whlpos, whlt = wheel.position, wheel.timestamps
-
-                for k in trials_numbers:#range(len(trials['contrastLeft'])):
-                    # trialnum = trials_numbers[k]
-                    trialnum = k
-
-                    if only_include_low_contrasts == 1:
-                        if ~low_contrast_trials_bool_all[k]:
-                            continue
-                    # print(str(trialnum))
-
-                    # start_time = taskData[trialnum]['behavior_data']['States timestamps']['trial_start'][0][0] - 0.03 #quiescent period - first 30ms step
-                    # start_time = taskData[trialnum]['behavior_data']['States timestamps']['reward'][0][0] - 0.5 #reward/error
-                    # if np.isnan(start_time) == 1:
-                    #     start_time = taskData[trialnum]['behavior_data']['States timestamps']['error'][0][0] - 0.5
-
-                    if align_to == 'goCue':
-                        start_time = trials.goCue_times[trialnum] #GO CUE
-                    elif align_to == 'goCue_pre':
-                        start_time = trials.goCue_times[trialnum] - 0.5 #GO CUE - 0.5s
-                    elif align_to == 'QP':
-                        start_time = trials.intervals[trialnum][0] #QP / Laser onset
-                    elif align_to == 'feedback':
-                        start_time = trials.feedback_times[trialnum] - 0.6
-
-                    wheel_start_index_pre = np.searchsorted(whlt, start_time)
-                    t = start_time
-                    # Check the closest value by comparing the differences between 't' and its neighboring elements
-                    if wheel_start_index_pre == 0:
-                        wheel_start_index = wheel_start_index_pre
-                    elif wheel_start_index_pre == len(whlt):
-                        wheel_start_index = wheel_start_index_pre - 1
-                    else:
-                        left_diff = t - whlt[wheel_start_index_pre - 1]
-                        right_diff = whlt[wheel_start_index_pre] - t
-                        wheel_start_index = wheel_start_index_pre - 1 if left_diff <= right_diff else wheel_start_index_pre
-
-
-                    total_wheel_movement = []
-                    for l in range(int(length_of_time_to_analyze_wheel_movement/interval)):
-                        t = (start_time + l*interval)# + interval #ie, steps of 100ms
-                        # wheel_end_index = np.argmin(np.abs(whlt - t))
-                        #norm_wheel_vals = whlpos[wheel_start_index:wheel_end_index]/whlpos[wheel_start_index]
-
-                        wheel_end_index_pre = np.searchsorted(whlt, t) #ie, steps of 100ms
-                        # Check the closest value by comparing the differences between 't' and its neighboring elements
-                        if wheel_end_index_pre == 0:
-                            wheel_end_index = wheel_end_index_pre
-                        elif wheel_end_index_pre == len(whlt):
-                            wheel_end_index = wheel_end_index_pre - 1
-                        else:
-                            left_diff = t - whlt[wheel_end_index_pre - 1]
-                            right_diff = whlt[wheel_end_index_pre] - t
-                            wheel_end_index = wheel_end_index_pre - 1 if left_diff <= right_diff else wheel_end_index_pre
-
-                        ##only in case where aligning to QP, do not use any wheel movement past goCue
-                        if align_to == 'QP' and trials.goCue_times[trialnum] < whlt[wheel_end_index]:
-                            total_wheel_movement = np.append(total_wheel_movement,np.nan)
-                        ##only in case where aligning to goCue, do not use any wheel movement past feedback + 0.1
-                        elif align_to == 'goCue' and (trials.feedback_times[trialnum] + interval) < whlt[wheel_end_index]:
-                            total_wheel_movement = np.append(total_wheel_movement,np.nan)
-                        elif align_to == 'goCue_pre' and (trials.feedback_times[trialnum] + interval) < whlt[wheel_end_index]:
-                            total_wheel_movement = np.append(total_wheel_movement,np.nan)
-                        else:
-                            total_wheel_movement = np.append(total_wheel_movement,whlpos[wheel_end_index] - whlpos[wheel_start_index])
-
-                    #determine whether trial is a stim or nonstim trial
-                    #nonstim
-                    if np.isin(trialnum,nonstim_trials_numbers):
-                        if trials.probabilityLeft[trialnum] == 0.2:
-                            if len(Rblock_wheel_movements_nonstim) == 0:
-                                Rblock_wheel_movements_nonstim = total_wheel_movement
-                            else:
-                                Rblock_wheel_movements_nonstim = np.vstack([Rblock_wheel_movements_nonstim,total_wheel_movement])
-                        if trials.probabilityLeft[trialnum] == 0.8:
-                            if len(Lblock_wheel_movements_nonstim) == 0:
-                                Lblock_wheel_movements_nonstim = total_wheel_movement
-                            else:
-                                Lblock_wheel_movements_nonstim = np.vstack([Lblock_wheel_movements_nonstim,total_wheel_movement])
-                    #stim
-                    elif np.isin(trialnum,stim_trials_numbers):
-                        if trials.probabilityLeft[trialnum] == 0.2:
-                            if  len(Rblock_wheel_movements_stim) == 0:
-                                Rblock_wheel_movements_stim = total_wheel_movement
-                            else:
-                                Rblock_wheel_movements_stim = np.vstack([Rblock_wheel_movements_stim,total_wheel_movement])
-                        if trials.probabilityLeft[trialnum] == 0.8:
-                            if len(Lblock_wheel_movements_stim) == 0:
-                                Lblock_wheel_movements_stim = total_wheel_movement
-                            else:
-                                Lblock_wheel_movements_stim = np.vstack([Lblock_wheel_movements_stim,total_wheel_movement])
-                    else:
-                        raise Exception('Trials must be either stim or nonstim; something is wrong')
-            #############################################################
-
-            if num_analyzed_sessions == 0:
-                stim_trials.contrastRight = trials.contrastRight[stim_trials_numbers]
-                stim_trials.contrastLeft = trials.contrastLeft[stim_trials_numbers]
-                stim_trials.goCueTrigger_times = trials.goCueTrigger_times[stim_trials_numbers]
-                stim_trials.feedback_times = trials.feedback_times[stim_trials_numbers]
-                stim_trials.response_times = trials.response_times[stim_trials_numbers]
-                stim_trials.feedbackType = trials.feedbackType[stim_trials_numbers]
-                stim_trials.goCue_times = trials.goCue_times[stim_trials_numbers]
-                stim_trials.firstMovement_times = trials.firstMovement_times[stim_trials_numbers]
-                stim_trials.probabilityLeft = trials.probabilityLeft[stim_trials_numbers]
-                stim_trials.stimOn_times = trials.stimOn_times[stim_trials_numbers]
-                stim_trials.choice = trials.choice[stim_trials_numbers]
-                stim_trials.prev_choice = trials.choice[stim_trials_numbers-1]
-                stim_trials.rewardVolume = trials.rewardVolume[stim_trials_numbers]
-                stim_trials.intervals = trials.intervals[stim_trials_numbers]
-                stim_trials.reaction_times = stim_trials.feedback_times - stim_trials.stimOn_times
-                nonstim_trials.contrastRight = trials.contrastRight[nonstim_trials_numbers]
-                nonstim_trials.contrastLeft = trials.contrastLeft[nonstim_trials_numbers]
-                nonstim_trials.goCueTrigger_times = trials.goCueTrigger_times[nonstim_trials_numbers]
-                nonstim_trials.feedback_times = trials.feedback_times[nonstim_trials_numbers]
-                nonstim_trials.response_times = trials.response_times[nonstim_trials_numbers]
-                nonstim_trials.feedbackType = trials.feedbackType[nonstim_trials_numbers]
-                nonstim_trials.goCue_times = trials.goCue_times[nonstim_trials_numbers]
-                nonstim_trials.firstMovement_times = trials.firstMovement_times[nonstim_trials_numbers]
-                nonstim_trials.probabilityLeft = trials.probabilityLeft[nonstim_trials_numbers]
-                nonstim_trials.stimOn_times = trials.stimOn_times[nonstim_trials_numbers]
-                nonstim_trials.choice = trials.choice[nonstim_trials_numbers]
-                nonstim_trials.prev_choice = trials.choice[nonstim_trials_numbers-1]
-                nonstim_trials.rewardVolume = trials.rewardVolume[nonstim_trials_numbers]
-                nonstim_trials.intervals = trials.intervals[nonstim_trials_numbers]
-                nonstim_trials.reaction_times = nonstim_trials.feedback_times - nonstim_trials.stimOn_times
-                stim_trials_contrast = signed_contrast(stim_trials)
-                nonstim_trials_contrast = signed_contrast(nonstim_trials)
-                rt_stimtrials_all = rt_stimtrials
-                qp_stimtrials_all = qp_stimtrials
-                rt_nonstimtrials_all = rt_nonstimtrials
-                qp_nonstimtrials_all = qp_nonstimtrials
-                rt_stimtrials_all_persubject = np.nanmean(rt_stimtrials)
-                qp_stimtrials_all_persubject = np.nanmean(qp_stimtrials)
-                rt_nonstimtrials_all_persubject = np.nanmean(rt_nonstimtrials)
-                qp_nonstimtrials_all_persubject = np.nanmean(qp_nonstimtrials)
-                num_analyzed_sessions = 1
-                num_unique_mice = 1
-                previous_mouse_ID = current_mouse_ID
-            else:
-                stim_trials.contrastRight = np.append(stim_trials.contrastRight,trials.contrastRight[stim_trials_numbers])
-                stim_trials.contrastLeft = np.append(stim_trials.contrastLeft,trials.contrastLeft[stim_trials_numbers])
-                stim_trials.goCueTrigger_times = np.append(stim_trials.goCueTrigger_times,trials.goCueTrigger_times[stim_trials_numbers])
-                stim_trials.feedback_times = np.append(stim_trials.feedback_times,trials.feedback_times[stim_trials_numbers])
-                stim_trials.response_times = np.append(stim_trials.response_times,trials.response_times[stim_trials_numbers])
-                stim_trials.feedbackType = np.append(stim_trials.feedbackType,trials.feedbackType[stim_trials_numbers])
-                stim_trials.goCue_times = np.append(stim_trials.goCue_times,trials.goCue_times[stim_trials_numbers])
-                stim_trials.firstMovement_times = np.append(stim_trials.firstMovement_times,trials.firstMovement_times[stim_trials_numbers])
-                stim_trials.probabilityLeft = np.append(stim_trials.probabilityLeft,trials.probabilityLeft[stim_trials_numbers])
-                stim_trials.stimOn_times = np.append(stim_trials.stimOn_times,trials.stimOn_times[stim_trials_numbers])
-                stim_trials.choice = np.append(stim_trials.choice,trials.choice[stim_trials_numbers])
-                stim_trials.prev_choice = np.append(stim_trials.prev_choice,trials.choice[stim_trials_numbers-1])
-                stim_trials.rewardVolume = np.append(stim_trials.rewardVolume,trials.rewardVolume[stim_trials_numbers])
-                stim_trials.intervals = np.append(stim_trials.intervals,trials.intervals[stim_trials_numbers])
-                stim_trials.reaction_times = np.append(stim_trials.reaction_times,trials.feedback_times[stim_trials_numbers] - trials.stimOn_times[stim_trials_numbers])
-                nonstim_trials.contrastRight = np.append(nonstim_trials.contrastRight,trials.contrastRight[nonstim_trials_numbers])
-                nonstim_trials.contrastLeft = np.append(nonstim_trials.contrastLeft,trials.contrastLeft[nonstim_trials_numbers])
-                nonstim_trials.goCueTrigger_times = np.append(nonstim_trials.goCueTrigger_times,trials.goCueTrigger_times[nonstim_trials_numbers])
-                nonstim_trials.feedback_times = np.append(nonstim_trials.feedback_times,trials.feedback_times[nonstim_trials_numbers])
-                nonstim_trials.response_times = np.append(nonstim_trials.response_times,trials.response_times[nonstim_trials_numbers])
-                nonstim_trials.feedbackType = np.append(nonstim_trials.feedbackType,trials.feedbackType[nonstim_trials_numbers])
-                nonstim_trials.goCue_times = np.append(nonstim_trials.goCue_times,trials.goCue_times[nonstim_trials_numbers])
-                nonstim_trials.firstMovement_times = np.append(nonstim_trials.firstMovement_times,trials.firstMovement_times[nonstim_trials_numbers])
-                nonstim_trials.probabilityLeft = np.append(nonstim_trials.probabilityLeft,trials.probabilityLeft[nonstim_trials_numbers])
-                nonstim_trials.stimOn_times = np.append(nonstim_trials.stimOn_times,trials.stimOn_times[nonstim_trials_numbers])
-                nonstim_trials.choice = np.append(nonstim_trials.choice,trials.choice[nonstim_trials_numbers])
-                nonstim_trials.prev_choice = np.append(nonstim_trials.prev_choice,trials.choice[nonstim_trials_numbers-1])
-                nonstim_trials.rewardVolume = np.append(nonstim_trials.rewardVolume,trials.rewardVolume[nonstim_trials_numbers])
-                nonstim_trials.intervals = np.append(nonstim_trials.intervals,trials.intervals[nonstim_trials_numbers])
-                nonstim_trials.reaction_times = np.append(nonstim_trials.reaction_times,trials.feedback_times[nonstim_trials_numbers] - trials.stimOn_times[nonstim_trials_numbers])
-                # stim_trials_contrast = np.append(stim_trials_contrast,signed_contrast(stim_trials))
-                # nonstim_trials_contrast = np.append(nonstim_trials_contrast,signed_contrast(nonstim_trials)) #??? check this
-                rt_stimtrials_all = np.append(rt_stimtrials_all,rt_stimtrials)
-                qp_stimtrials_all = np.append(qp_stimtrials_all,qp_stimtrials)
-                rt_nonstimtrials_all = np.append(rt_nonstimtrials_all,rt_nonstimtrials)
-                qp_nonstimtrials_all = np.append(qp_nonstimtrials_all,qp_nonstimtrials)
-
-                rt_stimtrials_all_persubject = np.append(rt_stimtrials_all_persubject,np.nanmean(rt_stimtrials))
-                qp_stimtrials_all_persubject = np.append(qp_stimtrials_all_persubject,np.nanmean(qp_stimtrials))
-                rt_nonstimtrials_all_persubject = np.append(rt_nonstimtrials_all_persubject,np.nanmean(rt_nonstimtrials))
-                qp_nonstimtrials_all_persubject = np.append(qp_nonstimtrials_all_persubject,np.nanmean(qp_nonstimtrials))
-                num_analyzed_sessions = num_analyzed_sessions + 1
-                if previous_mouse_ID != current_mouse_ID:
-                    num_unique_mice = num_unique_mice + 1
-                    previous_mouse_ID = current_mouse_ID
-
-
-        ############################################ the following is analysis for zapit sessions
-        ########################################################################################
-        else:
-            laser_intervals = one.load_dataset(eid, '_ibl_laserStimulation.intervals')
-
-            if trials_ranges[j] == 'ALL':
-                trials_range = range(0,len(trials['contrastLeft']))
-            #### use last trial as end of range when end of range set to 9999
-            elif trials_ranges[j][-1] == 9998:
-                trials_range = [x for x in trials_ranges[j] if x < np.size(trials.probabilityLeft)]
-            else:
-                trials_range = trials_ranges[j]
-            # if remove_trials_before > 0 and j < loop_threshold_for_remove:
-            #     trials_range = list(np.array(trials_range)[np.where(np.array(trials_range) > remove_trials_before)[0]])
-            # if len(trials_range) < min_num_trials:
-            #     print('Not enough trials in ' + str(eid) + ' , skipping...')
-            #     continue
-
-            ### load GLM HMM state labels and restrict trials range
-            try: 
-                if state_def == 'current' and n_states == 2: 
-                    engaged_idx, disengaged_idx = get_glmhmm_indices(current_mouse_ID, eid, state_probability, n_states)
-
-                elif state_def == 'previous' and n_states == 2:
-                    # engaged_idx = engaged_indices[current_mouse_ID][eid]
-                    # disengaged_idx = disengaged_indices[current_mouse_ID][eid]
-                    engaged_idx, disengaged_idx = get_glmhmm_indices(current_mouse_ID, eid, state_probability, n_states)
-                    engaged_idx = engaged_idx + 1
-                    disengaged_idx = disengaged_idx + 1
-                elif state_def == 'current' and n_states == 4:
-                    state_1_idx, state_2_idx, state_3_idx, state_4_idx = get_glmhmm_indices(current_mouse_ID, eid, state_probability, n_states)
-                elif state_def == 'previous' and n_states == 4:
-                    state_1_idx, state_2_idx, state_3_idx, state_4_idx = get_glmhmm_indices(current_mouse_ID, eid, state_probability, n_states)
-                    state_1_idx = state_1_idx[0] + 1
-                    state_2_idx = state_2_idx[0] + 1
-                    state_3_idx = state_3_idx[0] + 1
-                    state_4_idx = state_4_idx[0] + 1
-                    
-            except:
-                print(f'no glm-hmm state labels found for eid: {eid}. skipping session...')
-                continue
-
-            ####################
-
-            if n_states == 2:
-                if state_type == 'engaged':
-                    trials_range = np.intersect1d(engaged_idx, trials_range)
-                elif state_type == 'disengaged':
-                    trials_range = np.intersect1d(disengaged_idx, trials_range)
-                elif state_type == 'bypass':
-                    trials_range = trials_range
-            else:
-                if state_type == 'state1':
-                    trials_range = np.intersect1d(state_1_idx, trials_range)
-                elif state_type == 'state2':
-                    trials_range = np.intersect1d(state_2_idx, trials_range)
-                elif state_type == 'state3':
-                    trials_range = np.intersect1d(state_3_idx, trials_range)
-                elif state_type == 'state4':
-                    trials_range = np.intersect1d(state_4_idx, trials_range)
-                elif state_type == 'engaged':
-                    indices = np.concatenate([state_1_idx[0], state_3_idx[0]])
-                    trials_range = np.intersect1d(indices, trials_range)
-                elif state_type == 'disengaged':
-                    indices = np.concatenate([state_2_idx[0], state_4_idx[0]])
-                    trials_range = np.intersect1d(indices, trials_range)
-                elif state_type == 'bypass':
-                    trials_range = trials_range
-
-            ############################## zapit stim locations log
-            file_path = '/Users/natemiska/python/bias_coding/zapit_trials.yml'
-
-            details = one.get_details(eid)
-            exp_start_time_str = details['start_time']
-
-            if eid == '21d33b44-f75f-4711-a2c7-0bdfe8eec386': #strange issue with logged stims in this session
-                exp_start_time_str = '2024-03-29T18:07:38.0'
-
-            # Convert session start to datetime object
-            session_start = datetime.strptime(exp_start_time_str[0:19], '%Y-%m-%dT%H:%M:%S')
-
-            event_num = 0
-            line_num = 0
-            with open(file_path, 'r') as file:
-                # Skip the first line
-                next(file)
-                # List to hold events that occur during or after the session start
-                relevant_events = []
-                for line in file:
-                    if line_num > 211510:
-                        continue
-                        ### encountering a weird fucking error where the 2nd to last line of the yml file is being interpreted as '/n'?? Dunno where this is coming from as it's not in the file itself as far as i can see
-                    # Extract the timestamp part from the line and convert it to a datetime object
-                    # Assuming the format is always "YYYY-MM-DD HH:MM:SS", which corresponds to the first 19 characters
-                    event_timestamp_str = line[:19]
-                    # print(event_timestamp_str)
-                    event_timestamp = datetime.strptime(event_timestamp_str, '%Y-%m-%d %H:%M:%S')
-                    line_num = line_num + 1
-                    
-                    # Check if the event timestamp is equal to or later than the session start
-                    if event_timestamp >= session_start:
-                        relevant_events.append(line.strip())  # Add event line to the list, stripping newline characters
-
-                event_num = event_num + 1
-
-            # # Now, relevant_events contains all the lines for events during or after the session start
-            # for event in relevant_events:
-            #     print(event)
-            ######################### end zapit log load
-                
-            ### Loop that extracts trial number and stim location for each laser stim
-            stimtrial_location_dict = {}
-            previous_logged_timestamp = datetime.strptime(relevant_events[0][:19], '%Y-%m-%d %H:%M:%S')
-            previous_laser_interval = laser_intervals[0,0]
-            for k in range(0,len(laser_intervals[:,0]) - 2): #loop is num of laser stim for session
-                if k == 0:
-                    continue
-                    #1st stim can be before 1st trial?
-                elif eid == '21d33b44-f75f-4711-a2c7-0bdfe8eec386' and k < 10: #strange issue with logged stims in this session
-                    continue
+                        react = trials['feedback_times'][k] - trials['goCue_times'][k]
+                        if react < RT_threshold:
+                            nonstim_trials_numbers[k] = k                 
+        except:
+            for k in trials_range:
+                if taskData[k]['opto'] == 1:
+                    react = trials['feedback_times'][k] - trials['goCue_times'][k]
+                    if react < RT_threshold:
+                        stim_trials_numbers[k] = k
                 else:
-                    trialnum = np.where(laser_intervals[k,0]==trials.intervals[:,0])[0][0]
-                    stim_location = relevant_events[k][20:22]
-                    cleaned_stim_location = int(re.sub(r'\D', '', stim_location))
-                    stimtrial_location_dict[trialnum] = cleaned_stim_location
-                    logged_time = relevant_events[k][0:19]
-                    if eid == '5a41494f-25b9-48d4-8159-527141bd4742': #strange exception where logged events off by 1 starting ~trial 11
-                        logged_time = relevant_events[k-1][0:19]
-                    logged_timestamp = event_timestamp = datetime.strptime(logged_time, '%Y-%m-%d %H:%M:%S')
-                    # print('trial number = ' + str(trialnum))
-                    # print('laser interval = ' + str(laser_intervals[k,0]))
-                    # print('logged time = ' + logged_time)
+                    react = trials['feedback_times'][k] - trials['goCue_times'][k]
+                    if react < RT_threshold:
+                        nonstim_trials_numbers[k] = k    
+            
+        # if state_def == 'previous':                         # TO DO: account for trials where stim was on 2 trials in a row !!
+        #     prev_stim_trials_numbers = stim_trials_numbers -
 
-                    delta = logged_timestamp - previous_logged_timestamp
-                    delta_log = delta.total_seconds()
-                    # print('delta log = ' + str(delta_log))
-                    delta_interval = laser_intervals[k,0] - previous_laser_interval
-                    # print('delta interval = ' + str(delta_interval))
-                    # if abs(delta_log - delta_interval) > 1:
-                    #     print('Warning, laser log may be incorrect for trial ' + str(trialnum))
-                    #     ui = input("Press Enter to continue, e to exit...")
-                    #     if ui == 'e':
-                    #         raise Exception('Script terminated by user')
+        ### further refines stim/nonstim trials numbers (consider revisiting this to make sure it is working as intended!)
+        trials_numbers = np.concatenate((nonstim_trials_numbers,stim_trials_numbers))
+        trials_numbers = trials_numbers[~np.isnan(trials_numbers)]
+        stim_trials_numbers = stim_trials_numbers[~np.isnan(stim_trials_numbers)]
+        nonstim_trials_numbers = nonstim_trials_numbers[~np.isnan(nonstim_trials_numbers)]
+        stim_trials_numbers = stim_trials_numbers.astype(int)
+        nonstim_trials_numbers = nonstim_trials_numbers.astype(int)
+        trials_numbers = trials_numbers.astype(int)
+        if only_include_bias_trials == 1:
+            stim_trials_numbers = stim_trials_numbers[stim_trials_numbers>89]
+            nonstim_trials_numbers = nonstim_trials_numbers[nonstim_trials_numbers>89]
+            trials_numbers = trials_numbers[trials_numbers>89]
+        if use_trials_after_stim == 1:
+            for l in range(len(stim_trials_numbers)): 
+                if l == len(stim_trials_numbers) - 1: 
+                    if stim_trials_numbers[l] > nonstim_trials_numbers[len(nonstim_trials_numbers) - 1]:
+                        stim_trials_numbers[l] = 9999
+                        continue
+                    else:
+                        stim_trials_numbers[l] = stim_trials_numbers[l] + 1
+                else:
+                    if stim_trials_numbers[l+1] - stim_trials_numbers[l] == 1:
+                        stim_trials_numbers[l] = 9999
+                        continue
+                    else:
+                        stim_trials_numbers[l] = stim_trials_numbers[l] + 1
+
+        stim_trials_numbers = stim_trials_numbers[stim_trials_numbers!=9999]
+        rt_stimtrials = reaction_times[stim_trials_numbers]
+        qp_stimtrials = quiescent_period_times[stim_trials_numbers]
+        rt_nonstimtrials = reaction_times[nonstim_trials_numbers]
+        qp_nonstimtrials = quiescent_period_times[nonstim_trials_numbers]
+
+        # ### remove all "stim" trials from nonstim trials
+        # nonstim_trials_numbers = np.setdiff1d(nonstim_trials_numbers, stim_trials_numbers)
+
+        #### for removing sessions that do not meet behavior criteria BEFORE loading GLM-HMM data
+        stim_trials_NOGLMHMM = trials.copy()
+        nonstim_trials_NOGLMHMM = trials.copy()
+        stim_trials_NOGLMHMM.contrastRight = trials.contrastRight[stim_trials_numbers]
+        stim_trials_NOGLMHMM.contrastLeft = trials.contrastLeft[stim_trials_numbers]
+        stim_trials_NOGLMHMM.goCueTrigger_times = trials.goCueTrigger_times[stim_trials_numbers]
+        stim_trials_NOGLMHMM.feedback_times = trials.feedback_times[stim_trials_numbers]
+        stim_trials_NOGLMHMM.response_times = trials.response_times[stim_trials_numbers]
+        stim_trials_NOGLMHMM.feedbackType = trials.feedbackType[stim_trials_numbers]
+        stim_trials_NOGLMHMM.goCue_times = trials.goCue_times[stim_trials_numbers]
+        stim_trials_NOGLMHMM.firstMovement_times = trials.firstMovement_times[stim_trials_numbers]
+        stim_trials_NOGLMHMM.probabilityLeft = trials.probabilityLeft[stim_trials_numbers]
+        stim_trials_NOGLMHMM.stimOn_times = trials.stimOn_times[stim_trials_numbers]
+        stim_trials_NOGLMHMM.choice = trials.choice[stim_trials_numbers]
+        stim_trials_NOGLMHMM.prev_choice = trials.choice[stim_trials_numbers-1]
+        stim_trials_NOGLMHMM.rewardVolume = trials.rewardVolume[stim_trials_numbers]
+        stim_trials_NOGLMHMM.intervals = trials.intervals[stim_trials_numbers]
+        nonstim_trials_NOGLMHMM.contrastRight = trials.contrastRight[nonstim_trials_numbers]
+        nonstim_trials_NOGLMHMM.contrastLeft = trials.contrastLeft[nonstim_trials_numbers]
+        nonstim_trials_NOGLMHMM.goCueTrigger_times = trials.goCueTrigger_times[nonstim_trials_numbers]
+        nonstim_trials_NOGLMHMM.feedback_times = trials.feedback_times[nonstim_trials_numbers]
+        nonstim_trials_NOGLMHMM.response_times = trials.response_times[nonstim_trials_numbers]
+        nonstim_trials_NOGLMHMM.feedbackType = trials.feedbackType[nonstim_trials_numbers]
+        nonstim_trials_NOGLMHMM.goCue_times = trials.goCue_times[nonstim_trials_numbers]
+        nonstim_trials_NOGLMHMM.firstMovement_times = trials.firstMovement_times[nonstim_trials_numbers]
+        nonstim_trials_NOGLMHMM.probabilityLeft = trials.probabilityLeft[nonstim_trials_numbers]
+        nonstim_trials_NOGLMHMM.stimOn_times = trials.stimOn_times[nonstim_trials_numbers]
+        nonstim_trials_NOGLMHMM.choice = trials.choice[nonstim_trials_numbers]
+        nonstim_trials_NOGLMHMM.prev_choice = trials.choice[nonstim_trials_numbers-1]
+        nonstim_trials_NOGLMHMM.rewardVolume = trials.rewardVolume[nonstim_trials_numbers]
+        nonstim_trials_NOGLMHMM.intervals = trials.intervals[nonstim_trials_numbers]
+
+        stim_trials_NOGLMHMM_contrast = signed_contrast(stim_trials_NOGLMHMM)
+        nonstim_trials_NOGLMHMM_contrast = signed_contrast(nonstim_trials_NOGLMHMM)
+
+        nonstim_trialnums_NOGLMHMM_HCR = np.where(nonstim_trials_NOGLMHMM_contrast == 100)[0]
+        nonstim_trialnums_NOGLMHMM_HCL = np.where(nonstim_trials_NOGLMHMM_contrast == -100)[0]
+        ### restrict to trials range
+        nonstim_trialnums_NOGLMHMM_HCR = np.intersect1d(nonstim_trialnums_NOGLMHMM_HCR, trials_range)
+        nonstim_trialnums_NOGLMHMM_HCL = np.intersect1d(nonstim_trialnums_NOGLMHMM_HCL, trials_range)
+        nonstim_num_correct_NOGLMHMM_HCR = np.sum(nonstim_trials_NOGLMHMM.rewardVolume[nonstim_trialnums_NOGLMHMM_HCR])/1.5
+        nonstim_num_correct_NOGLMHMM_HCL = np.sum(nonstim_trials_NOGLMHMM.rewardVolume[nonstim_trialnums_NOGLMHMM_HCL])/1.5
+
+        stim_trialnums_NOGLMHMM_HCR = np.where(stim_trials_NOGLMHMM_contrast == 100)[0]
+        stim_trialnums_NOGLMHMM_HCL = np.where(stim_trials_NOGLMHMM_contrast == -100)[0]
+        ### restrict to trials range
+        stim_trialnums_NOGLMHMM_HCR = np.intersect1d(stim_trialnums_NOGLMHMM_HCR, trials_range)
+        stim_trialnums_NOGLMHMM_HCL = np.intersect1d(stim_trialnums_NOGLMHMM_HCL, trials_range)
+        stim_num_correct_NOGLMHMM_HCR = np.sum(stim_trials_NOGLMHMM.rewardVolume[stim_trialnums_NOGLMHMM_HCR])/1.5
+        stim_num_correct_NOGLMHMM_HCL = np.sum(stim_trials_NOGLMHMM.rewardVolume[stim_trialnums_NOGLMHMM_HCL])/1.5
+
+        # if nonstim_num_correct_NOGLMHMM_HCR/np.size(nonstim_trialnums_NOGLMHMM_HCR) < BL_perf_thresh or nonstim_num_correct_NOGLMHMM_HCL/np.size(nonstim_trialnums_NOGLMHMM_HCL) < BL_perf_thresh:
+        #     print(eid + ' below BASELINE performance threshold, excluding...')
+        #     continue
+        # if stim_num_correct_NOGLMHMM_HCR/np.size(stim_trialnums_NOGLMHMM_HCR) < stim_perf_thresh or stim_num_correct_NOGLMHMM_HCL/np.size(stim_trialnums_NOGLMHMM_HCL) < stim_perf_thresh:
+        #     print(eid + ' below STIM performance threshold, excluding...')
+        #     continue
+
+        ##### GLM-HMMM #####
+        try: 
+            if state_def == 'current' and n_states == 2: 
+                engaged_idx, disengaged_idx = get_glmhmm_indices(current_mouse_ID, eid, state_probability, n_states)
+
+            elif state_def == 'previous' and n_states == 2:
+                # engaged_idx = engaged_indices[current_mouse_ID][eid]
+                # disengaged_idx = disengaged_indices[current_mouse_ID][eid]
+                engaged_idx, disengaged_idx = get_glmhmm_indices(current_mouse_ID, eid, state_probability, n_states)
+                engaged_idx = engaged_idx + 1
+                disengaged_idx = disengaged_idx + 1
+            elif state_def == 'current' and n_states == 4:
+                state_1_idx, state_2_idx, state_3_idx, state_4_idx = get_glmhmm_indices(current_mouse_ID, eid, state_probability, n_states)
+            elif state_def == 'previous' and n_states == 4:
+                state_1_idx, state_2_idx, state_3_idx, state_4_idx = get_glmhmm_indices(current_mouse_ID, eid, state_probability, n_states)
+                state_1_idx = state_1_idx[0] + 1
+                state_2_idx = state_2_idx[0] + 1
+                state_3_idx = state_3_idx[0] + 1
+                state_4_idx = state_4_idx[0] + 1
                 
-                    previous_laser_interval = laser_intervals[k,0]
-                    previous_logged_timestamp = logged_timestamp
+        except:
+            print(f'no glm-hmm state labels found for eid: {eid}. skipping session...')
+            continue
+
+        ####################
+
+        if n_states == 2:
+            if state_type == 'engaged':
+                trials_numbers = np.intersect1d(engaged_idx, trials_numbers)
+            elif state_type == 'disengaged':
+                trials_numbers = np.intersect1d(disengaged_idx, trials_numbers)
+            elif state_type == 'bypass':
+                trials_numbers = trials_numbers
+        else:
+            if state_type == 'state1':
+                trials_numbers = np.intersect1d(state_1_idx, trials_numbers)
+            elif state_type == 'state2':
+                trials_numbers = np.intersect1d(state_2_idx, trials_numbers)
+            elif state_type == 'state3':
+                trials_numbers = np.intersect1d(state_3_idx, trials_numbers)
+            elif state_type == 'state4':
+                trials_numbers = np.intersect1d(state_4_idx, trials_numbers)
+            elif state_type == 'engaged':
+                indices = np.concatenate([state_1_idx[0], state_3_idx[0]])
+                trials_numbers = np.intersect1d(indices, trials_numbers)
+            elif state_type == 'disengaged':
+                indices = np.concatenate([state_2_idx[0], state_4_idx[0]])
+                trials_numbers = np.intersect1d(indices, trials_numbers)
+            elif state_type == 'bypass':
+                trials_numbers = trials_numbers
 
 
-            stimtrial_location_dict_all = {k: 0 for k in trials_range}
-            stimtrial_location_dict_all.update(stimtrial_location_dict)
+        #for subsampling, maybe check on each iteration here if # L&R trials in each block is equal
+        #alternatively, can take randomly equal number of trials from each and pool them together
+        #ie, make 2 groups each block, RstimRblock, LstimRblock, LstimLblock, and RstimLblock
+        #and subsample randomly equal amount of each for each block
+        if subsample_trials_after_stim:
+            Rblock_inds_stim = stim_trials_numbers[np.where(trials.probabilityLeft[stim_trials_numbers] == 0.2)[0]]
+            Lblock_inds_stim = stim_trials_numbers[np.where(trials.probabilityLeft[stim_trials_numbers] == 0.8)[0]]
+            PrevLchoice_inds_stim = stim_trials_numbers[np.where(trials.choice[stim_trials_numbers-1] == -1)[0]]
+            PrevRchoice_inds_stim = stim_trials_numbers[np.where(trials.choice[stim_trials_numbers-1] == 1)[0]]
+            ind_Lblock_Lprevchoice_stim = np.intersect1d(Lblock_inds_stim,PrevLchoice_inds_stim)
+            ind_Lblock_Rprevchoice_stim = np.intersect1d(Lblock_inds_stim,PrevRchoice_inds_stim)
+            ind_Rblock_Lprevchoice_stim = np.intersect1d(Rblock_inds_stim,PrevLchoice_inds_stim)
+            ind_Rblock_Rprevchoice_stim = np.intersect1d(Rblock_inds_stim,PrevRchoice_inds_stim)
 
-            ### make new dict that simply adds 1 to each key
-            if use_trials_after_stim == 1:
-                stimtrial_location_dict_OG = stimtrial_location_dict_all
-                stimtrial_location_dict_all = {key + 1: value for key, value in stimtrial_location_dict_all.items() if np.min(trials_range) <= key < np.max(trials_range)}
+            if len(ind_Lblock_Lprevchoice_stim) > len(ind_Lblock_Rprevchoice_stim):
+                subsample_indices_toremove_A = random.sample(list(ind_Lblock_Lprevchoice_stim), len(ind_Lblock_Lprevchoice_stim) - len(ind_Lblock_Rprevchoice_stim))
+            elif len(ind_Lblock_Lprevchoice_stim) < len(ind_Lblock_Rprevchoice_stim):
+                subsample_indices_toremove_A = random.sample(list(ind_Lblock_Rprevchoice_stim), len(ind_Lblock_Rprevchoice_stim) - len(ind_Lblock_Lprevchoice_stim))
+
+            if len(ind_Rblock_Lprevchoice_stim) > len(ind_Rblock_Rprevchoice_stim):
+                subsample_indices_toremove_B = random.sample(list(ind_Rblock_Lprevchoice_stim), len(ind_Rblock_Lprevchoice_stim) - len(ind_Rblock_Rprevchoice_stim))
+            elif len(ind_Rblock_Lprevchoice_stim) < len(ind_Rblock_Rprevchoice_stim):
+                subsample_indices_toremove_B = random.sample(list(ind_Rblock_Rprevchoice_stim), len(ind_Rblock_Rprevchoice_stim) - len(ind_Rblock_Lprevchoice_stim))
+
+            subsample_indices_toremove = np.concatenate([subsample_indices_toremove_A,subsample_indices_toremove_B])
+            # stim_trials_numbers_test = stim_trials_numbers
+            for k in subsample_indices_toremove:
+                # stim_trials_numbers_test = np.delete(stim_trials_numbers_test, np.where(stim_trials_numbers_test == k))
+                stim_trials_numbers = np.delete(stim_trials_numbers, np.where(stim_trials_numbers == k))
+
+        ### sessions with few trials will occasionally have 0 after GLM-HMM and quality criteria, need to remove
+        if len(stim_trials_numbers) == 0:
+            print('no trials remain after thresholding, skipping session...')
+            continue
+
+        ###for quantifying ipsi/contraversive turns
+        # Calculate bias index 
+        nonstim_direction = trials.choice[nonstim_trials_numbers]
+        nonstim_leftward = np.sum(nonstim_direction == 1)
+        nonstim_rightward = np.sum(nonstim_direction == -1)
+        nonstim_bias = (nonstim_rightward - nonstim_leftward) / len(nonstim_direction)
+
+        stim_direction = trials.choice[stim_trials_numbers]
+        stim_leftward = np.sum(stim_direction == 1)
+        stim_rightward = np.sum(stim_direction == -1)
+        stim_bias = (stim_rightward - stim_leftward) / len(stim_direction)
+
+        # Effect size
+        deviation.append(stim_bias - nonstim_bias) 
+
+        #### need to update stim trials numbers to reflect GLM-HMM selected states
+        stim_trials_numbers = np.intersect1d(trials_numbers,stim_trials_numbers)
+        nonstim_trials_numbers = np.intersect1d(trials_numbers,nonstim_trials_numbers)
+
+        # Ensure all temporary index arrays are perfectly clean (no NaNs or floats)
+        stim_trials_numbers = stim_trials_numbers[~np.isnan(stim_trials_numbers)].astype(int)
+        nonstim_trials_numbers = nonstim_trials_numbers[~np.isnan(nonstim_trials_numbers)].astype(int)
+
+        # 2. Before appending to the master object, ensure all trials being pulled are unique and valid.
+        # While you have np.setdiff1d, ensure your exclusion of nonstim trials that were stim trials is 100% correct
+        # The contamination is often caused by an index remaining in the nonstim list when it shouldn't.
+
+        # Re-enforce the exclusion:
+        nonstim_trials_numbers = np.setdiff1d(nonstim_trials_numbers, stim_trials_numbers)
+
+        ###for estimating bias shift
+        stim_trials_temp = trials.copy()
+        nonstim_trials_temp = trials.copy()
+        stim_trials_temp.contrastRight = trials.contrastRight[stim_trials_numbers]
+        stim_trials_temp.contrastLeft = trials.contrastLeft[stim_trials_numbers]
+        stim_trials_temp.goCueTrigger_times = trials.goCueTrigger_times[stim_trials_numbers]
+        stim_trials_temp.feedback_times = trials.feedback_times[stim_trials_numbers]
+        stim_trials_temp.response_times = trials.response_times[stim_trials_numbers]
+        stim_trials_temp.feedbackType = trials.feedbackType[stim_trials_numbers]
+        stim_trials_temp.goCue_times = trials.goCue_times[stim_trials_numbers]
+        stim_trials_temp.firstMovement_times = trials.firstMovement_times[stim_trials_numbers]
+        stim_trials_temp.probabilityLeft = trials.probabilityLeft[stim_trials_numbers]
+        stim_trials_temp.stimOn_times = trials.stimOn_times[stim_trials_numbers]
+        stim_trials_temp.choice = trials.choice[stim_trials_numbers]
+        stim_trials_temp.prev_choice = trials.choice[stim_trials_numbers-1]
+        stim_trials_temp.rewardVolume = trials.rewardVolume[stim_trials_numbers]
+        stim_trials_temp.intervals = trials.intervals[stim_trials_numbers]
+        nonstim_trials_temp.contrastRight = trials.contrastRight[nonstim_trials_numbers]
+        nonstim_trials_temp.contrastLeft = trials.contrastLeft[nonstim_trials_numbers]
+        nonstim_trials_temp.goCueTrigger_times = trials.goCueTrigger_times[nonstim_trials_numbers]
+        nonstim_trials_temp.feedback_times = trials.feedback_times[nonstim_trials_numbers]
+        nonstim_trials_temp.response_times = trials.response_times[nonstim_trials_numbers]
+        nonstim_trials_temp.feedbackType = trials.feedbackType[nonstim_trials_numbers]
+        nonstim_trials_temp.goCue_times = trials.goCue_times[nonstim_trials_numbers]
+        nonstim_trials_temp.firstMovement_times = trials.firstMovement_times[nonstim_trials_numbers]
+        nonstim_trials_temp.probabilityLeft = trials.probabilityLeft[nonstim_trials_numbers]
+        nonstim_trials_temp.stimOn_times = trials.stimOn_times[nonstim_trials_numbers]
+        nonstim_trials_temp.choice = trials.choice[nonstim_trials_numbers]
+        nonstim_trials_temp.prev_choice = trials.choice[nonstim_trials_numbers-1]
+        nonstim_trials_temp.rewardVolume = trials.rewardVolume[nonstim_trials_numbers]
+        nonstim_trials_temp.intervals = trials.intervals[nonstim_trials_numbers]
+        stim_trials_temp_contrast = signed_contrast(stim_trials_temp)
+        nonstim_trials_temp_contrast = signed_contrast(nonstim_trials_temp)
+
+        nonstim_trialnums_HCR = np.where(nonstim_trials_temp_contrast == 100)[0]
+        nonstim_trialnums_HCL = np.where(nonstim_trials_temp_contrast == -100)[0]
+        num_correct_HCR = np.sum(nonstim_trials_temp.rewardVolume[nonstim_trialnums_HCR])/1.5
+        num_correct_HCL = np.sum(nonstim_trials_temp.rewardVolume[nonstim_trialnums_HCL])/1.5
+
+        stim_trialnums_HCR = np.where(stim_trials_temp_contrast == 100)[0]
+        stim_trialnums_HCL = np.where(stim_trials_temp_contrast == -100)[0]
+        stim_num_correct_HCR = np.sum(stim_trials_temp.rewardVolume[stim_trialnums_HCR])/1.5
+        stim_num_correct_HCL = np.sum(stim_trials_temp.rewardVolume[stim_trialnums_HCL])/1.5
+
+        all_signed_contrast = signed_contrast(trials)
+        abs_signed_contrast = abs(all_signed_contrast)
+
+        low_contrast_trials_bool_all = abs_signed_contrast < low_contrast_threshold
+
+        # if num_correct_HCR/np.size(nonstim_trialnums_HCR) < BL_perf_thresh or num_correct_HCL/np.size(nonstim_trialnums_HCL) < BL_perf_thresh:
+        #     print(eid + ' below performance threshold, excluding...')
+        #     continue
+        # if stim_num_correct_HCR/np.size(stim_trialnums_HCR) < stim_perf_thresh or stim_num_correct_HCL/np.size(stim_trialnums_HCL) < stim_perf_thresh:
+        #     print(eid + ' below performance threshold, excluding...')
+        #     continue
+
+        #waitforbuttonpress
+
+        ### for evaluating accuracy at low contrasts in stim vs nonstim conditions
+        ### n = sessions
+        ### currently, low contrasts == 0
+        low_contrast_indices_stim = np.where(stim_trials_temp_contrast < 1)[0]
+        low_contrast_indices_nonstim = np.where(nonstim_trials_temp_contrast < 1)[0]
+        correct_indices_lowcontrast_stim = np.where(stim_trials_temp.feedbackType[low_contrast_indices_stim] == 1)[0]
+        correct_indices_lowcontrast_nonstim = np.where(nonstim_trials_temp.feedbackType[low_contrast_indices_nonstim] == 1)[0]
+        accuracy_lowcontrast_stim[j] = len(correct_indices_lowcontrast_stim)/len(low_contrast_indices_stim)
+        accuracy_lowcontrast_nonstim[j] = len(correct_indices_lowcontrast_nonstim)/len(low_contrast_indices_nonstim)
+
+        stim_trials_data = {}
+        for pL in np.unique(stim_trials_temp.probabilityLeft):
+            in_block = stim_trials_temp.probabilityLeft == pL
+            xx, nn = np.unique(stim_trials_temp_contrast[in_block], return_counts=True)
+            rightward = stim_trials_temp.choice == -1
+            pp = np.vectorize(lambda x: np.mean(rightward[(x == stim_trials_temp_contrast) & in_block]))(xx)
+            stim_trials_data[pL] = np.vstack((xx, nn, pp))
+
+        nonstim_trials_data = {}
+        for pL in np.unique(nonstim_trials_temp.probabilityLeft):
+            in_block = nonstim_trials_temp.probabilityLeft == pL
+            xx, nn = np.unique(nonstim_trials_temp_contrast[in_block], return_counts=True)
+            rightward = nonstim_trials_temp.choice == -1
+            pp = np.vectorize(lambda x: np.mean(rightward[(x == nonstim_trials_temp_contrast) & in_block]))(xx)
+            nonstim_trials_data[pL] = np.vstack((xx, nn, pp))
+
+        kwargs = {                                                                      # CONTROLS PSYCHOMETRIC FIT
+            # parmin: The minimum allowable parameter values, in the form
+            # [bias, threshold, lapse_low, lapse_high]
+            'parmin': np.array([-25., 10., 0., 0.]),
+            # parmax: The maximum allowable parameter values
+            'parmax': np.array([100, 100., 1, 1]),
+            # Non-zero starting parameters, used to try to avoid local minima
+            'parstart': np.array([0., 40., .1, .1]),
+            # nfits: The number of fits to run
+            'nfits': 50
+        }
+        kwargs['parmin'][0] = -50.
+        kwargs['parmax'][0] = 50.
+
+        # For each block type, fit the data separately and plot
+        #### Currently, bias is computed from FIT for each session - this is necessary as there are occasionally values missing
+        #### Maybe the best way is to compute bias shift for each mouse based on concatenated trials / psych curve subtraction, and then n is a value for each mouse, not session
+        for pL, da in nonstim_trials_data.items():
+            # Fit it
+            pars, L = psy.mle_fit_psycho(da, 'erf_psycho_2gammas', **kwargs); 
+
+            if pL == 0.8:
+                bias_80_value0 = psy.erf_psycho_2gammas(pars, 0)
+                bias_80_valuen100 = psy.erf_psycho_2gammas(pars, -100)
+                bias_80_valuen25 = psy.erf_psycho_2gammas(pars, -25)
+                bias_80_valuen12 = psy.erf_psycho_2gammas(pars, -12)
+                bias_80_valuen6 = psy.erf_psycho_2gammas(pars, -6)
+                bias_80_value100 = psy.erf_psycho_2gammas(pars, 100)
+                bias_80_value25 = psy.erf_psycho_2gammas(pars, 25)
+                bias_80_value12 = psy.erf_psycho_2gammas(pars, 12)
+                bias_80_value6 = psy.erf_psycho_2gammas(pars, 6)
+                # bias_80_value0 = da[2,:][4]
+                # bias_80_valuen100 = da[2,:][0]
+                # bias_80_valuen25 = da[2,:][1]
+                # bias_80_valuen12 = da[2,:][2]
+                # bias_80_valuen6 = da[2,:][3]
+                # bias_80_value100 = da[2,:][8]
+                # bias_80_value25 = da[2,:][7]
+                # bias_80_value12 = da[2,:][6]
+                # bias_80_value6 = da[2,:][5]
+
+            if pL == 0.2:
+                bias_20_value0 = psy.erf_psycho_2gammas(pars, 0)
+                bias_20_valuen100 = psy.erf_psycho_2gammas(pars, -100)
+                bias_20_valuen25 = psy.erf_psycho_2gammas(pars, -25)
+                bias_20_valuen12 = psy.erf_psycho_2gammas(pars, -12)
+                bias_20_valuen6 = psy.erf_psycho_2gammas(pars, -6)
+                bias_20_value100 = psy.erf_psycho_2gammas(pars, 100)
+                bias_20_value25 = psy.erf_psycho_2gammas(pars, 25)
+                bias_20_value12 = psy.erf_psycho_2gammas(pars, 12)
+                bias_20_value6 = psy.erf_psycho_2gammas(pars, 6)
+                # bias_20_value0 = da[2,:][4]
+                # bias_20_valuen100 = da[2,:][0]
+                # bias_20_valuen25 = da[2,:][1]
+                # bias_20_valuen12 = da[2,:][2]
+                # bias_20_valuen6 = da[2,:][3]
+                # bias_20_value100 = da[2,:][8]
+                # bias_20_value25 = da[2,:][7]
+                # bias_20_value12 = da[2,:][6]
+                # bias_20_value6 = da[2,:][5]
 
 
+        bias_shift0 = bias_20_value0 - bias_80_value0
+        bias_shiftn100 = bias_20_valuen100 - bias_80_valuen100
+        bias_shiftn25 = bias_20_valuen25 - bias_80_valuen25
+        bias_shiftn12 = bias_20_valuen12 - bias_80_valuen12
+        bias_shiftn6 = bias_20_valuen6 - bias_80_valuen6
+        bias_shift100 = bias_20_value100 - bias_80_value100
+        bias_shift25 = bias_20_value25 - bias_80_value25
+        bias_shift12 = bias_20_value12 - bias_80_value12
+        bias_shift6 = bias_20_value6 - bias_80_value6
+        bias_shift_sum_all_temp = sum([bias_shift0,bias_shiftn100,bias_shiftn25,bias_shiftn12,bias_shiftn6,bias_shift100,bias_shift25,bias_shift12,bias_shift6])
+        if bias_shift_sum_all_temp < min_bias_threshold:
+            print(eid + ' below minimum baseline bias threshold, excluding...')
+            continue
 
-            ####################################################################################
-            ### for removing whole session if it does not meet behavioral criteria
-            session_data_nonstim = {i: [] for i in range(0, 1)}
-            if use_trials_after_stim == 1:
-                trials_with_condition_zero = [trial for trial, condition in stimtrial_location_dict_OG.items() if condition == 0]  ###need to make sure this propogates
-            else:
-                trials_with_condition_zero = [trial for trial, condition in stimtrial_location_dict_all.items() if condition == 0]
-            for trial_number in trials_with_condition_zero:
-                # reaction_time = trials.feedback_times[trial_number] - trials.goCueTrigger_times[trial_number]  #depricated
-                # if np.isnan(reaction_time) == 1:
-                reaction_time = trials.feedback_times[trial_number] - trials.goCue_times[trial_number] ###reaction time definitions may be unreliable - any other ways to define?
+        ## CHANGE HERE TO SWITCH between all vs low stim comparison --> high vs low stim
+        bias_shift_sum_all_nonstim_temp = sum([bias_shiftn100,bias_shift100,bias_shiftn25,bias_shift25]) #bias_shift_sum_all_temp
+        bias_shift_sum_all_nonstim_LC_temp = sum([bias_shift0,bias_shiftn12,bias_shiftn6,bias_shift12,bias_shift6])
+        bias_shift0_all_nonstim[j] = bias_shift0
+        bias_shift_sum_all_nonstim_LEFT[j] = sum([bias_shiftn100,bias_shiftn25]) #sum([bias_shift0,bias_shiftn100,bias_shiftn25,bias_shiftn12,bias_shiftn6])
+        bias_shift_sum_all_nonstim_RIGHT[j] = sum([bias_shift100,bias_shift25]) #sum([bias_shift0,bias_shift100,bias_shift25,bias_shift12,bias_shift6])
 
-                trials_data = {
-                    'choice': trials.choice[trial_number],
-                    'reaction_times': reaction_time,
-                    'qp_times': trials.goCue_times[trial_number] - trials.intervals[trial_number][0],
-                    'contrast': signed_contrast(trials)[trial_number],
-                    'feedbackType': trials.feedbackType[trial_number],
-                    'probabilityLeft': trials.probabilityLeft[trial_number],
-                    # 'prev_choice': trials.choice[trial_number-1]
-                }
-                session_data_nonstim[0].append(trials_data)
+        #     pval_all = stats.ttest_rel(bias_shift_sum_all_nonstim,bias_shift_sum_all)
 
-            nonstim_feedback = [trial['feedbackType'] for trial in session_data_nonstim[0] if trial['contrast'] in (-100, -25, 25, 100)]
-            correct_rate_nonstim = np.sum(np.array(nonstim_feedback) == 1) / len(nonstim_feedback)
-            print('Accuracy at high contrasts = ' + str(correct_rate_nonstim))
-            if correct_rate_nonstim < BL_perf_thresh:
-                print('Session eid = ' + eid + ' is below minimum performance threshold, skipping...')
-                continue
+        for pL, da in stim_trials_data.items():
+            # Fit it
+            pars, L = psy.mle_fit_psycho(da, 'erf_psycho_2gammas', **kwargs);
 
-            # create criteria for minimum bias session
-            choices_L100_Lblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == -100 and trial['probabilityLeft'] == 0.8]
-            choices_L25_Lblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == -25 and trial['probabilityLeft'] == 0.8]
-            choices_L12_Lblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == -12.5 and trial['probabilityLeft'] == 0.8]
-            choices_L6_Lblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == -6.25 and trial['probabilityLeft'] == 0.8]
-            choices_0_Lblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == 0 and trial['probabilityLeft'] == 0.8]
-            choices_R6_Lblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == 6.25 and trial['probabilityLeft'] == 0.8]
-            choices_R12_Lblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == 12.5 and trial['probabilityLeft'] == 0.8]
-            choices_R25_Lblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == 25 and trial['probabilityLeft'] == 0.8]
-            choices_R100_Lblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == 100 and trial['probabilityLeft'] == 0.8]
-            choices_L100_Rblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == -100 and trial['probabilityLeft'] == 0.2]
-            choices_L25_Rblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == -25 and trial['probabilityLeft'] == 0.2]
-            choices_L12_Rblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == -12.5 and trial['probabilityLeft'] == 0.2]
-            choices_L6_Rblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == -6.25 and trial['probabilityLeft'] == 0.2]
-            choices_0_Rblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == 0 and trial['probabilityLeft'] == 0.2]
-            choices_R6_Rblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == 6.25 and trial['probabilityLeft'] == 0.2]
-            choices_R12_Rblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == 12.5 and trial['probabilityLeft'] == 0.2]
-            choices_R25_Rblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == 25 and trial['probabilityLeft'] == 0.2]
-            choices_R100_Rblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == 100 and trial['probabilityLeft'] == 0.2]
+            if pL == 0.8:
+                bias_80_value0 = psy.erf_psycho_2gammas(pars, 0)
+                bias_80_valuen100 = psy.erf_psycho_2gammas(pars, -100)
+                bias_80_valuen25 = psy.erf_psycho_2gammas(pars, -25)
+                bias_80_valuen12 = psy.erf_psycho_2gammas(pars, -12)
+                bias_80_valuen6 = psy.erf_psycho_2gammas(pars, -6)
+                bias_80_value100 = psy.erf_psycho_2gammas(pars, 100)
+                bias_80_value25 = psy.erf_psycho_2gammas(pars, 25)
+                bias_80_value12 = psy.erf_psycho_2gammas(pars, 12)
+                bias_80_value6 = psy.erf_psycho_2gammas(pars, 6)
+                # bias_80_value0 = da[2,:][4]
+                # bias_80_valuen100 = da[2,:][0]
+                # bias_80_valuen25 = da[2,:][1]
+                # bias_80_valuen12 = da[2,:][2]
+                # bias_80_valuen6 = da[2,:][3]
+                # bias_80_value100 = da[2,:][8]
+                # bias_80_value25 = da[2,:][7]
+                # bias_80_value12 = da[2,:][6]
+                # bias_80_value6 = da[2,:][5]
 
-            biasshift_L100 = np.sum(np.array(choices_L100_Lblock) == 1)/len(choices_L100_Lblock) - np.sum(np.array(choices_L100_Rblock) == 1)/len(choices_L100_Rblock)
-            if np.isnan(biasshift_L100) == 1:
-                biasshift_L100 = 0
-            biasshift_L25 = np.sum(np.array(choices_L25_Lblock) == 1)/len(choices_L25_Lblock) - np.sum(np.array(choices_L25_Rblock) == 1)/len(choices_L25_Rblock)
-            if np.isnan(biasshift_L100) == 1:
-                biasshift_L100 = 0
-            biasshift_L12 = np.sum(np.array(choices_L12_Lblock) == 1)/len(choices_L12_Lblock) - np.sum(np.array(choices_L12_Rblock) == 1)/len(choices_L12_Rblock)
-            if np.isnan(biasshift_L100) == 1:
-                biasshift_L100 = 0
-            biasshift_L6 = np.sum(np.array(choices_L6_Lblock) == 1)/len(choices_L6_Lblock) - np.sum(np.array(choices_L6_Rblock) == 1)/len(choices_L6_Rblock)
-            if np.isnan(biasshift_L100) == 1:
-                biasshift_L100 = 0
-            biasshift_0 = np.sum(np.array(choices_0_Lblock) == 1)/len(choices_0_Lblock) - np.sum(np.array(choices_0_Rblock) == 1)/len(choices_0_Rblock)
-            if np.isnan(biasshift_L100) == 1:
-                biasshift_L100 = 0
-            biasshift_R6 = np.sum(np.array(choices_R6_Lblock) == 1)/len(choices_R6_Lblock) - np.sum(np.array(choices_R6_Rblock) == 1)/len(choices_R6_Rblock)
-            if np.isnan(biasshift_L100) == 1:
-                biasshift_L100 = 0
-            biasshift_R12 = np.sum(np.array(choices_R12_Lblock) == 1)/len(choices_R12_Lblock) - np.sum(np.array(choices_R12_Rblock) == 1)/len(choices_R12_Rblock)
-            if np.isnan(biasshift_L100) == 1:
-                biasshift_L100 = 0
-            biasshift_R25 = np.sum(np.array(choices_R25_Lblock) == 1)/len(choices_R25_Lblock) - np.sum(np.array(choices_R25_Rblock) == 1)/len(choices_R25_Rblock)
-            if np.isnan(biasshift_L100) == 1:
-                biasshift_L100 = 0
-            biasshift_R100 = np.sum(np.array(choices_R100_Lblock) == 1)/len(choices_R100_Lblock) - np.sum(np.array(choices_R100_Rblock) == 1)/len(choices_R100_Rblock)
-            if np.isnan(biasshift_L100) == 1:
-                biasshift_L100 = 0
-
-            total_biasshift = biasshift_L100 + biasshift_L25 + biasshift_L12 + biasshift_L6 + biasshift_0 + biasshift_R6 + biasshift_R12 + biasshift_R25 + biasshift_R100
-            print('Total bias shift = ' + str(total_biasshift))
-            if total_biasshift < min_bias_threshold_zapit:
-                print('Bias shift for session below threshold, skipping...')
-                continue
+            if pL == 0.2:
+                bias_20_value0 = psy.erf_psycho_2gammas(pars, 0)
+                bias_20_valuen100 = psy.erf_psycho_2gammas(pars, -100)
+                bias_20_valuen25 = psy.erf_psycho_2gammas(pars, -25)
+                bias_20_valuen12 = psy.erf_psycho_2gammas(pars, -12)
+                bias_20_valuen6 = psy.erf_psycho_2gammas(pars, -6)
+                bias_20_value100 = psy.erf_psycho_2gammas(pars, 100)
+                bias_20_value25 = psy.erf_psycho_2gammas(pars, 25)
+                bias_20_value12 = psy.erf_psycho_2gammas(pars, 12)
+                bias_20_value6 = psy.erf_psycho_2gammas(pars, 6)
+                # bias_20_value0 = da[2,:][4]
+                # bias_20_valuen100 = da[2,:][0]
+                # bias_20_valuen25 = da[2,:][1]
+                # bias_20_valuen12 = da[2,:][2]
+                # bias_20_valuen6 = da[2,:][3]
+                # bias_20_value100 = da[2,:][8]
+                # bias_20_value25 = da[2,:][7]
+                # bias_20_value12 = da[2,:][6]
+                # bias_20_value6 = da[2,:][5]
 
 
-            ####### creating a new dict to separate trials data by stim location        
-            ####### this formats the data in an easily accessible manner w/ conditions_data
-            ####### Loop over all trials and sort them into the condition_data dictionary
-            ####### Also, extract and save wheel data within this loop
+        bias_shift0 = bias_20_value0 - bias_80_value0
+        bias_shiftn100 = bias_20_valuen100 - bias_80_valuen100
+        bias_shiftn25 = bias_20_valuen25 - bias_80_valuen25
+        bias_shiftn12 = bias_20_valuen12 - bias_80_valuen12
+        bias_shiftn6 = bias_20_valuen6 - bias_80_valuen6
+        bias_shift100 = bias_20_value100 - bias_80_value100
+        bias_shift25 = bias_20_value25 - bias_80_value25
+        bias_shift12 = bias_20_value12 - bias_80_value12
+        bias_shift6 = bias_20_value6 - bias_80_value6
 
+        # ALSO CHANGE HERE TO SWITCH BETWEEN ALL AND HIGH CONTRAST COMPARISONS
+        bias_shift_sum_all_temp = sum([bias_shiftn100,bias_shift100,bias_shiftn25,bias_shift25]) #sum([bias_shift0,bias_shiftn100,bias_shiftn25,bias_shiftn12,bias_shiftn6,bias_shift100,bias_shift25,bias_shift12,bias_shift6])
+        bias_shift_sum_all_LC_temp = sum([bias_shift0,bias_shiftn12,bias_shiftn6,bias_shift12,bias_shift6])
+        bias_shift0_all_stim[j] = bias_shift0
+        bias_shift_sum_all_LEFT[j] = sum([bias_shiftn100,bias_shiftn25]) #sum([bias_shift0,bias_shiftn100,bias_shiftn25,bias_shiftn12,bias_shiftn6])
+        bias_shift_sum_all_RIGHT[j] = sum([bias_shift100,bias_shift25]) #sum([bias_shift0,bias_shift100,bias_shift25,bias_shift12,bias_shift6])
+
+        #############################################################
+        ##### Load wheel data
+        if use_trials_after_stim == 0: ##wheel analysis not currently set up for stim+1 condition
             whlpos, whlt = wheel.position, wheel.timestamps
 
-            for trial_number, condition_number in stimtrial_location_dict_all.items():
-                # print(str(trial_number) + ' ' + str(condition_number))
-
-                reaction_time = trials.feedback_times[trial_number] - trials.goCue_times[trial_number] 
-                if np.isnan(reaction_time) == 1:
-                    if np.isnan(RT_threshold) == 0:
-                        continue
-                if reaction_time > RT_threshold:
-                    if np.isnan(RT_threshold) == 0:
-                        continue
-
-                trials_data = {
-                    # 'intervals': trials.intervals[trial_number],
-                    'choice': trials.choice[trial_number],
-                    'reaction_times': reaction_time,
-                    'qp_times': trials.goCue_times[trial_number] - trials.intervals[trial_number][0],
-                    'contrast': signed_contrast(trials)[trial_number],
-                    # 'goCueTrigger_times': trials.goCueTrigger_times[trial_number],
-                    # 'goCue_times': trials.goCue_times[trial_number],
-                    # 'stimOn_times': trials.stimOn_times[trial_number],
-                    # 'feedback_times': trials.feedback_times[trial_number],
-                    # 'response_times': trials.response_times[trial_number],
-                    'feedbackType': trials.feedbackType[trial_number],
-                    'probabilityLeft': trials.probabilityLeft[trial_number],
-                    # 'prev_choice': trials.choice[trial_number-1]
-                }
-                
-                # Append the trial data to the correct condition
-                condition_data[condition_number].append(trials_data)
-
-                # Now condition_data[1] contains all trials for location 1, condition_data[2] for location 2, and so on
-                # condition_data[0] contains all nonstim trials
-
-                #############################################################
-                ##### Load wheel data
+            for k in trials_numbers:#range(len(trials['contrastLeft'])):
+                # trialnum = trials_numbers[k]
+                trialnum = k
 
                 if only_include_low_contrasts == 1:
                     if ~low_contrast_trials_bool_all[k]:
                         continue
-                # start_time = taskData[trial_number]['behavior_data']['States timestamps']['trial_start'][0][0] - 0.03 #quiescent period - first 30ms step
-                # start_time = taskData[trial_number]['behavior_data']['States timestamps']['reward'][0][0] - 0.5 #reward/error
+                # print(str(trialnum))
+
+                # start_time = taskData[trialnum]['behavior_data']['States timestamps']['trial_start'][0][0] - 0.03 #quiescent period - first 30ms step
+                # start_time = taskData[trialnum]['behavior_data']['States timestamps']['reward'][0][0] - 0.5 #reward/error
                 # if np.isnan(start_time) == 1:
-                #     start_time = taskData[trial_number]['behavior_data']['States timestamps']['error'][0][0] - 0.5
+                #     start_time = taskData[trialnum]['behavior_data']['States timestamps']['error'][0][0] - 0.5
 
                 if align_to == 'goCue':
-                    start_time = trials.goCue_times[trial_number] #GO CUE
+                    start_time = trials.goCue_times[trialnum] #GO CUE
                 elif align_to == 'goCue_pre':
-                    start_time = trials.goCue_times[trial_number] - 0.5 #GO CUE - 0.5s
+                    start_time = trials.goCue_times[trialnum] - 0.5 #GO CUE - 0.5s
                 elif align_to == 'QP':
-                    start_time = trials.intervals[trial_number][0] #QP / Laser onset
+                    start_time = trials.intervals[trialnum][0] #QP / Laser onset
                 elif align_to == 'feedback':
-                    start_time = trials.feedback_times[trial_number] - 0.6
+                    start_time = trials.feedback_times[trialnum] - 0.6
 
                 wheel_start_index_pre = np.searchsorted(whlt, start_time)
                 t = start_time
@@ -1207,29 +977,551 @@ for j in range(103,np.size(eids)):
                         wheel_end_index = wheel_end_index_pre - 1 if left_diff <= right_diff else wheel_end_index_pre
 
                     ##only in case where aligning to QP, do not use any wheel movement past goCue
-                    if align_to == 'QP' and trials.goCue_times[trial_number] < whlt[wheel_end_index]:
+                    if align_to == 'QP' and trials.goCue_times[trialnum] < whlt[wheel_end_index]:
                         total_wheel_movement = np.append(total_wheel_movement,np.nan)
                     ##only in case where aligning to goCue, do not use any wheel movement past feedback + 0.1
-                    elif align_to == 'goCue' and (trials.feedback_times[trial_number] + interval) < whlt[wheel_end_index]:
+                    elif align_to == 'goCue' and (trials.feedback_times[trialnum] + interval) < whlt[wheel_end_index]:
                         total_wheel_movement = np.append(total_wheel_movement,np.nan)
-                    elif align_to == 'goCue_pre' and (trials.feedback_times[trial_number] + interval) < whlt[wheel_end_index]:
+                    elif align_to == 'goCue_pre' and (trials.feedback_times[trialnum] + interval) < whlt[wheel_end_index]:
                         total_wheel_movement = np.append(total_wheel_movement,np.nan)
                     else:
                         total_wheel_movement = np.append(total_wheel_movement,whlpos[wheel_end_index] - whlpos[wheel_start_index])
 
-                ### append data here according to condition
-                if trials.probabilityLeft[trial_number] == 0.2:
-                    if len(Rblock_wheel_movements_by_condition[condition_number]) == 0:
-                        Rblock_wheel_movements_by_condition[condition_number] = total_wheel_movement
-                    else:
-                        Rblock_wheel_movements_by_condition[condition_number] = np.vstack([Rblock_wheel_movements_by_condition[condition_number],total_wheel_movement])
-                if trials.probabilityLeft[trial_number] == 0.8:
-                    if len(Lblock_wheel_movements_by_condition[condition_number]) == 0:
-                        Lblock_wheel_movements_by_condition[condition_number] = total_wheel_movement
-                    else:
-                        Lblock_wheel_movements_by_condition[condition_number] = np.vstack([Lblock_wheel_movements_by_condition[condition_number],total_wheel_movement])
-    except:
-        print('There was a problem with this session, skipping...')        
+                #determine whether trial is a stim or nonstim trial
+                #nonstim
+                if np.isin(trialnum,nonstim_trials_numbers):
+                    if trials.probabilityLeft[trialnum] == 0.2:
+                        if len(Rblock_wheel_movements_nonstim) == 0:
+                            Rblock_wheel_movements_nonstim = total_wheel_movement
+                        else:
+                            Rblock_wheel_movements_nonstim = np.vstack([Rblock_wheel_movements_nonstim,total_wheel_movement])
+                    if trials.probabilityLeft[trialnum] == 0.8:
+                        if len(Lblock_wheel_movements_nonstim) == 0:
+                            Lblock_wheel_movements_nonstim = total_wheel_movement
+                        else:
+                            Lblock_wheel_movements_nonstim = np.vstack([Lblock_wheel_movements_nonstim,total_wheel_movement])
+                #stim
+                elif np.isin(trialnum,stim_trials_numbers):
+                    if trials.probabilityLeft[trialnum] == 0.2:
+                        if  len(Rblock_wheel_movements_stim) == 0:
+                            Rblock_wheel_movements_stim = total_wheel_movement
+                        else:
+                            Rblock_wheel_movements_stim = np.vstack([Rblock_wheel_movements_stim,total_wheel_movement])
+                    if trials.probabilityLeft[trialnum] == 0.8:
+                        if len(Lblock_wheel_movements_stim) == 0:
+                            Lblock_wheel_movements_stim = total_wheel_movement
+                        else:
+                            Lblock_wheel_movements_stim = np.vstack([Lblock_wheel_movements_stim,total_wheel_movement])
+                else:
+                    raise Exception('Trials must be either stim or nonstim; something is wrong')
+        #############################################################
+
+        ### updated per mouse-based logic
+        # 1. Create Bunches for THIS session only
+        # We use the helper function to extract exactly the trials we want
+        current_session_stim = slice_bunch(trials, stim_trials_numbers)
+        current_session_nonstim = slice_bunch(trials, nonstim_trials_numbers)
+        
+        # 2. Add calculated reaction times (since they aren't in the base trials object)
+        # Note: slice_bunch copies the object, so we can safely add new attributes
+        current_session_stim.reaction_times = reaction_times[stim_trials_numbers]
+        current_session_nonstim.reaction_times = reaction_times[nonstim_trials_numbers]
+
+        # 3. Add to the Mouse Container
+        if current_mouse_ID not in mouse_trials_container:
+            # First session for this mouse: Initialize
+            mouse_trials_container[current_mouse_ID] = {
+                'stim': current_session_stim,
+                'nonstim': current_session_nonstim
+            }
+        else:
+            # Subsequent session: Concatenate to existing mouse data
+            mouse_trials_container[current_mouse_ID]['stim'] = concat_bunches(
+                mouse_trials_container[current_mouse_ID]['stim'], 
+                current_session_stim
+            )
+            mouse_trials_container[current_mouse_ID]['nonstim'] = concat_bunches(
+                mouse_trials_container[current_mouse_ID]['nonstim'], 
+                current_session_nonstim
+            )
+
+        # 4. Standard housekeeping (for your per-session metrics)
+        # num_analyzed_sessions += 1
+
+        ###### THIS WHOLE CHUNK TO BE REMOVED
+        if num_analyzed_sessions == 0:
+            stim_trials.contrastRight = trials.contrastRight[stim_trials_numbers]
+            stim_trials.contrastLeft = trials.contrastLeft[stim_trials_numbers]
+            stim_trials.goCueTrigger_times = trials.goCueTrigger_times[stim_trials_numbers]
+            stim_trials.feedback_times = trials.feedback_times[stim_trials_numbers]
+            stim_trials.response_times = trials.response_times[stim_trials_numbers]
+            stim_trials.feedbackType = trials.feedbackType[stim_trials_numbers]
+            stim_trials.goCue_times = trials.goCue_times[stim_trials_numbers]
+            stim_trials.firstMovement_times = trials.firstMovement_times[stim_trials_numbers]
+            stim_trials.probabilityLeft = trials.probabilityLeft[stim_trials_numbers]
+            stim_trials.stimOn_times = trials.stimOn_times[stim_trials_numbers]
+            stim_trials.choice = trials.choice[stim_trials_numbers]
+            stim_trials.prev_choice = trials.choice[stim_trials_numbers-1]
+            stim_trials.rewardVolume = trials.rewardVolume[stim_trials_numbers]
+            stim_trials.intervals = trials.intervals[stim_trials_numbers]
+            stim_trials.reaction_times = stim_trials.feedback_times - stim_trials.stimOn_times
+            nonstim_trials.contrastRight = trials.contrastRight[nonstim_trials_numbers]
+            nonstim_trials.contrastLeft = trials.contrastLeft[nonstim_trials_numbers]
+            nonstim_trials.goCueTrigger_times = trials.goCueTrigger_times[nonstim_trials_numbers]
+            nonstim_trials.feedback_times = trials.feedback_times[nonstim_trials_numbers]
+            nonstim_trials.response_times = trials.response_times[nonstim_trials_numbers]
+            nonstim_trials.feedbackType = trials.feedbackType[nonstim_trials_numbers]
+            nonstim_trials.goCue_times = trials.goCue_times[nonstim_trials_numbers]
+            nonstim_trials.firstMovement_times = trials.firstMovement_times[nonstim_trials_numbers]
+            nonstim_trials.probabilityLeft = trials.probabilityLeft[nonstim_trials_numbers]
+            nonstim_trials.stimOn_times = trials.stimOn_times[nonstim_trials_numbers]
+            nonstim_trials.choice = trials.choice[nonstim_trials_numbers]
+            nonstim_trials.prev_choice = trials.choice[nonstim_trials_numbers-1]
+            nonstim_trials.rewardVolume = trials.rewardVolume[nonstim_trials_numbers]
+            nonstim_trials.intervals = trials.intervals[nonstim_trials_numbers]
+            nonstim_trials.reaction_times = nonstim_trials.feedback_times - nonstim_trials.stimOn_times
+            stim_trials_contrast = signed_contrast(stim_trials)
+            nonstim_trials_contrast = signed_contrast(nonstim_trials)
+            rt_stimtrials_all = rt_stimtrials
+            qp_stimtrials_all = qp_stimtrials
+            rt_nonstimtrials_all = rt_nonstimtrials
+            qp_nonstimtrials_all = qp_nonstimtrials
+            rt_stimtrials_all_persubject = np.nanmean(rt_stimtrials)
+            qp_stimtrials_all_persubject = np.nanmean(qp_stimtrials)
+            rt_nonstimtrials_all_persubject = np.nanmean(rt_nonstimtrials)
+            qp_nonstimtrials_all_persubject = np.nanmean(qp_nonstimtrials)
+            num_analyzed_sessions = 1
+            num_unique_mice = 1
+            previous_mouse_ID = current_mouse_ID
+            bias_shift_sum_all[j] = bias_shift_sum_all_temp
+            bias_shift_sum_all_LC[j] = bias_shift_sum_all_LC_temp
+            bias_shift_sum_all_nonstim[j] = bias_shift_sum_all_nonstim_temp
+            bias_shift_sum_all_nonstim_LC[j] = bias_shift_sum_all_nonstim_LC_temp
+            MouseIDs_used_for_final_analysis.append(current_mouse_ID)
+            EIDs_used_for_final_analysis.append(str(eid))
+            nonstim_trials_added_per_session.append(len(trials.contrastRight[nonstim_trials_numbers]))
+            stim_trials_added_per_session.append(len(trials.contrastRight[stim_trials_numbers]))
+        else:
+            stim_trials.contrastRight = np.append(stim_trials.contrastRight,trials.contrastRight[stim_trials_numbers])
+            stim_trials.contrastLeft = np.append(stim_trials.contrastLeft,trials.contrastLeft[stim_trials_numbers])
+            stim_trials.goCueTrigger_times = np.append(stim_trials.goCueTrigger_times,trials.goCueTrigger_times[stim_trials_numbers])
+            stim_trials.feedback_times = np.append(stim_trials.feedback_times,trials.feedback_times[stim_trials_numbers])
+            stim_trials.response_times = np.append(stim_trials.response_times,trials.response_times[stim_trials_numbers])
+            stim_trials.feedbackType = np.append(stim_trials.feedbackType,trials.feedbackType[stim_trials_numbers])
+            stim_trials.goCue_times = np.append(stim_trials.goCue_times,trials.goCue_times[stim_trials_numbers])
+            stim_trials.firstMovement_times = np.append(stim_trials.firstMovement_times,trials.firstMovement_times[stim_trials_numbers])
+            stim_trials.probabilityLeft = np.append(stim_trials.probabilityLeft,trials.probabilityLeft[stim_trials_numbers])
+            stim_trials.stimOn_times = np.append(stim_trials.stimOn_times,trials.stimOn_times[stim_trials_numbers])
+            stim_trials.choice = np.append(stim_trials.choice,trials.choice[stim_trials_numbers])
+            stim_trials.prev_choice = np.append(stim_trials.prev_choice,trials.choice[stim_trials_numbers-1])
+            stim_trials.rewardVolume = np.append(stim_trials.rewardVolume,trials.rewardVolume[stim_trials_numbers])
+            stim_trials.intervals = np.append(stim_trials.intervals,trials.intervals[stim_trials_numbers])
+            stim_trials.reaction_times = np.append(stim_trials.reaction_times,trials.feedback_times[stim_trials_numbers] - trials.stimOn_times[stim_trials_numbers])
+            nonstim_trials.contrastRight = np.append(nonstim_trials.contrastRight,trials.contrastRight[nonstim_trials_numbers])
+            nonstim_trials.contrastLeft = np.append(nonstim_trials.contrastLeft,trials.contrastLeft[nonstim_trials_numbers])
+            nonstim_trials.goCueTrigger_times = np.append(nonstim_trials.goCueTrigger_times,trials.goCueTrigger_times[nonstim_trials_numbers])
+            nonstim_trials.feedback_times = np.append(nonstim_trials.feedback_times,trials.feedback_times[nonstim_trials_numbers])
+            nonstim_trials.response_times = np.append(nonstim_trials.response_times,trials.response_times[nonstim_trials_numbers])
+            nonstim_trials.feedbackType = np.append(nonstim_trials.feedbackType,trials.feedbackType[nonstim_trials_numbers])
+            nonstim_trials.goCue_times = np.append(nonstim_trials.goCue_times,trials.goCue_times[nonstim_trials_numbers])
+            nonstim_trials.firstMovement_times = np.append(nonstim_trials.firstMovement_times,trials.firstMovement_times[nonstim_trials_numbers])
+            nonstim_trials.probabilityLeft = np.append(nonstim_trials.probabilityLeft,trials.probabilityLeft[nonstim_trials_numbers])
+            nonstim_trials.stimOn_times = np.append(nonstim_trials.stimOn_times,trials.stimOn_times[nonstim_trials_numbers])
+            nonstim_trials.choice = np.append(nonstim_trials.choice,trials.choice[nonstim_trials_numbers])
+            nonstim_trials.prev_choice = np.append(nonstim_trials.prev_choice,trials.choice[nonstim_trials_numbers-1])
+            nonstim_trials.rewardVolume = np.append(nonstim_trials.rewardVolume,trials.rewardVolume[nonstim_trials_numbers])
+            nonstim_trials.intervals = np.append(nonstim_trials.intervals,trials.intervals[nonstim_trials_numbers])
+            nonstim_trials.reaction_times = np.append(nonstim_trials.reaction_times,trials.feedback_times[nonstim_trials_numbers] - trials.stimOn_times[nonstim_trials_numbers])
+            # stim_trials_contrast = np.append(stim_trials_contrast,signed_contrast(stim_trials))
+            # nonstim_trials_contrast = np.append(nonstim_trials_contrast,signed_contrast(nonstim_trials)) #??? check this
+            rt_stimtrials_all = np.append(rt_stimtrials_all,rt_stimtrials)
+            qp_stimtrials_all = np.append(qp_stimtrials_all,qp_stimtrials)
+            rt_nonstimtrials_all = np.append(rt_nonstimtrials_all,rt_nonstimtrials)
+            qp_nonstimtrials_all = np.append(qp_nonstimtrials_all,qp_nonstimtrials)
+
+            rt_stimtrials_all_persubject = np.append(rt_stimtrials_all_persubject,np.nanmean(rt_stimtrials))
+            qp_stimtrials_all_persubject = np.append(qp_stimtrials_all_persubject,np.nanmean(qp_stimtrials))
+            rt_nonstimtrials_all_persubject = np.append(rt_nonstimtrials_all_persubject,np.nanmean(rt_nonstimtrials))
+            qp_nonstimtrials_all_persubject = np.append(qp_nonstimtrials_all_persubject,np.nanmean(qp_nonstimtrials))
+
+            bias_shift_sum_all[j] = bias_shift_sum_all_temp
+            bias_shift_sum_all_LC[j] = bias_shift_sum_all_LC_temp
+            bias_shift_sum_all_nonstim[j] = bias_shift_sum_all_nonstim_temp
+            bias_shift_sum_all_nonstim_LC[j] = bias_shift_sum_all_nonstim_LC_temp
+            
+            MouseIDs_used_for_final_analysis.append(current_mouse_ID)
+            EIDs_used_for_final_analysis.append(str(eid))
+            nonstim_trials_added_per_session.append(len(trials.contrastRight[nonstim_trials_numbers]))
+            stim_trials_added_per_session.append(len(trials.contrastRight[stim_trials_numbers]))
+
+            num_analyzed_sessions = num_analyzed_sessions + 1
+            if previous_mouse_ID != current_mouse_ID:
+                num_unique_mice = num_unique_mice + 1
+                previous_mouse_ID = current_mouse_ID
+            ###### THIS WHOLE CHUNK TO BE REMOVED
+
+
+    ############################################ the following is analysis for zapit sessions
+    ########################################################################################
+    else:
+        try:
+            ### dumb issue where sometimes collection is 'alf' and sometimes 'alf/task_00'. Apparently correct is latter.
+            laser_intervals = one.load_dataset(eid, '_ibl_laserStimulation.intervals', collection='alf/task_00')
+        except:
+            laser_intervals = one.load_dataset(eid, '_ibl_laserStimulation.intervals')
+
+        if trials_ranges[j] == 'ALL':
+            trials_range = range(0,len(trials['contrastLeft']))
+        #### use last trial as end of range when end of range set to 9999
+        elif trials_ranges[j][-1] == 9998:
+            trials_range = [x for x in trials_ranges[j] if x < np.size(trials.probabilityLeft)]
+        else:
+            trials_range = trials_ranges[j]
+        # if remove_trials_before > 0 and j < loop_threshold_for_remove:
+        #     trials_range = list(np.array(trials_range)[np.where(np.array(trials_range) > remove_trials_before)[0]])
+        # if len(trials_range) < min_num_trials:
+        #     print('Not enough trials in ' + str(eid) + ' , skipping...')
+        #     continue
+
+        ### load GLM HMM state labels and restrict trials range
+        try: 
+            if state_def == 'current' and n_states == 2: 
+                engaged_idx, disengaged_idx = get_glmhmm_indices(current_mouse_ID, eid, state_probability, n_states)
+
+            elif state_def == 'previous' and n_states == 2:
+                # engaged_idx = engaged_indices[current_mouse_ID][eid]
+                # disengaged_idx = disengaged_indices[current_mouse_ID][eid]
+                engaged_idx, disengaged_idx = get_glmhmm_indices(current_mouse_ID, eid, state_probability, n_states)
+                engaged_idx = engaged_idx + 1
+                disengaged_idx = disengaged_idx + 1
+            elif state_def == 'current' and n_states == 4:
+                state_1_idx, state_2_idx, state_3_idx, state_4_idx = get_glmhmm_indices(current_mouse_ID, eid, state_probability, n_states)
+            elif state_def == 'previous' and n_states == 4:
+                state_1_idx, state_2_idx, state_3_idx, state_4_idx = get_glmhmm_indices(current_mouse_ID, eid, state_probability, n_states)
+                state_1_idx = state_1_idx[0] + 1
+                state_2_idx = state_2_idx[0] + 1
+                state_3_idx = state_3_idx[0] + 1
+                state_4_idx = state_4_idx[0] + 1
+                
+        except:
+            print(f'no glm-hmm state labels found for eid: {eid}. skipping session...')
+            continue
+
+        ####################
+
+        if n_states == 2:
+            if state_type == 'engaged':
+                trials_range = np.intersect1d(engaged_idx, trials_range)
+            elif state_type == 'disengaged':
+                trials_range = np.intersect1d(disengaged_idx, trials_range)
+            elif state_type == 'bypass':
+                trials_range = trials_range
+        else:
+            if state_type == 'state1':
+                trials_range = np.intersect1d(state_1_idx, trials_range)
+            elif state_type == 'state2':
+                trials_range = np.intersect1d(state_2_idx, trials_range)
+            elif state_type == 'state3':
+                trials_range = np.intersect1d(state_3_idx, trials_range)
+            elif state_type == 'state4':
+                trials_range = np.intersect1d(state_4_idx, trials_range)
+            elif state_type == 'engaged':
+                indices = np.concatenate([state_1_idx[0], state_3_idx[0]])
+                trials_range = np.intersect1d(indices, trials_range)
+            elif state_type == 'disengaged':
+                indices = np.concatenate([state_2_idx[0], state_4_idx[0]])
+                trials_range = np.intersect1d(indices, trials_range)
+            elif state_type == 'bypass':
+                trials_range = trials_range
+
+        ############################## zapit stim locations log
+        file_path = '/Users/natemiska/python/bias_coding/zapit_trials.yml'
+
+        details = one.get_details(eid)
+        exp_start_time_str = details['start_time']
+
+        if eid == '21d33b44-f75f-4711-a2c7-0bdfe8eec386': #strange issue with logged stims in this session
+            exp_start_time_str = '2024-03-29T18:07:38.0'
+
+        # Convert session start to datetime object
+        session_start = datetime.strptime(exp_start_time_str[0:19], '%Y-%m-%dT%H:%M:%S')
+
+        event_num = 0
+        line_num = 0
+        with open(file_path, 'r') as file:
+            # Skip the first line
+            next(file)
+            # List to hold events that occur during or after the session start
+            relevant_events = []
+            for line in file:
+                if line_num > 211510:
+                    continue
+                    ### encountering a weird fucking error where the 2nd to last line of the yml file is being interpreted as '/n'?? Dunno where this is coming from as it's not in the file itself as far as i can see
+                # Extract the timestamp part from the line and convert it to a datetime object
+                # Assuming the format is always "YYYY-MM-DD HH:MM:SS", which corresponds to the first 19 characters
+                event_timestamp_str = line[:19]
+                # print(event_timestamp_str)
+                event_timestamp = datetime.strptime(event_timestamp_str, '%Y-%m-%d %H:%M:%S')
+                line_num = line_num + 1
+                
+                # Check if the event timestamp is equal to or later than the session start
+                if event_timestamp >= session_start:
+                    relevant_events.append(line.strip())  # Add event line to the list, stripping newline characters
+
+            event_num = event_num + 1
+
+        # # Now, relevant_events contains all the lines for events during or after the session start
+        # for event in relevant_events:
+        #     print(event)
+        ######################### end zapit log load
+            
+        ### Loop that extracts trial number and stim location for each laser stim
+        stimtrial_location_dict = {}
+        previous_logged_timestamp = datetime.strptime(relevant_events[0][:19], '%Y-%m-%d %H:%M:%S')
+        previous_laser_interval = laser_intervals[0,0]
+        for k in range(0,len(laser_intervals[:,0]) - 2): #loop is num of laser stim for session
+            if k == 0:
+                continue
+                #1st stim can be before 1st trial?
+            elif eid == '21d33b44-f75f-4711-a2c7-0bdfe8eec386' and k < 10: #strange issue with logged stims in this session
+                continue
+            else:
+                trialnum = np.where(laser_intervals[k,0]==trials.intervals[:,0])[0][0]
+                stim_location = relevant_events[k][20:22]
+                cleaned_stim_location = int(re.sub(r'\D', '', stim_location))
+                stimtrial_location_dict[trialnum] = cleaned_stim_location
+                logged_time = relevant_events[k][0:19]
+                if eid == '5a41494f-25b9-48d4-8159-527141bd4742': #strange exception where logged events off by 1 starting ~trial 11
+                    logged_time = relevant_events[k-1][0:19]
+                logged_timestamp = event_timestamp = datetime.strptime(logged_time, '%Y-%m-%d %H:%M:%S')
+                # print('trial number = ' + str(trialnum))
+                # print('laser interval = ' + str(laser_intervals[k,0]))
+                # print('logged time = ' + logged_time)
+
+                delta = logged_timestamp - previous_logged_timestamp
+                delta_log = delta.total_seconds()
+                # print('delta log = ' + str(delta_log))
+                delta_interval = laser_intervals[k,0] - previous_laser_interval
+                # print('delta interval = ' + str(delta_interval))
+                # if abs(delta_log - delta_interval) > 1:
+                #     print('Warning, laser log may be incorrect for trial ' + str(trialnum))
+                #     ui = input("Press Enter to continue, e to exit...")
+                #     if ui == 'e':
+                #         raise Exception('Script terminated by user')
+            
+                previous_laser_interval = laser_intervals[k,0]
+                previous_logged_timestamp = logged_timestamp
+
+
+        stimtrial_location_dict_all = {k: 0 for k in trials_range}
+        stimtrial_location_dict_all.update(stimtrial_location_dict)
+
+        ### make new dict that simply adds 1 to each key
+        if use_trials_after_stim == 1:
+            stimtrial_location_dict_OG = stimtrial_location_dict_all
+            stimtrial_location_dict_all = {key + 1: value for key, value in stimtrial_location_dict_all.items() if np.min(trials_range) <= key < np.max(trials_range)}
+
+
+
+        ####################################################################################
+        ### for removing whole session if it does not meet behavioral criteria
+        session_data_nonstim = {i: [] for i in range(0, 1)}
+        if use_trials_after_stim == 1:
+            trials_with_condition_zero = [trial for trial, condition in stimtrial_location_dict_OG.items() if condition == 0]  ###need to make sure this propogates
+        else:
+            trials_with_condition_zero = [trial for trial, condition in stimtrial_location_dict_all.items() if condition == 0]
+        for trial_number in trials_with_condition_zero:
+            # reaction_time = trials.feedback_times[trial_number] - trials.goCueTrigger_times[trial_number]  #depricated
+            # if np.isnan(reaction_time) == 1:
+            reaction_time = trials.feedback_times[trial_number] - trials.goCue_times[trial_number] ###reaction time definitions may be unreliable - any other ways to define?
+
+            trials_data = {
+                'choice': trials.choice[trial_number],
+                'reaction_times': reaction_time,
+                'qp_times': trials.goCue_times[trial_number] - trials.intervals[trial_number][0],
+                'contrast': signed_contrast(trials)[trial_number],
+                'feedbackType': trials.feedbackType[trial_number],
+                'probabilityLeft': trials.probabilityLeft[trial_number],
+                # 'prev_choice': trials.choice[trial_number-1]
+            }
+            session_data_nonstim[0].append(trials_data)
+
+        nonstim_feedback = [trial['feedbackType'] for trial in session_data_nonstim[0] if trial['contrast'] in (-100, -25, 25, 100)]
+        correct_rate_nonstim = np.sum(np.array(nonstim_feedback) == 1) / len(nonstim_feedback)
+        print('Accuracy at high contrasts = ' + str(correct_rate_nonstim))
+        if correct_rate_nonstim < BL_perf_thresh:
+            print('Session eid = ' + eid + ' is below minimum performance threshold, skipping...')
+            continue
+
+        # create criteria for minimum bias session
+        choices_L100_Lblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == -100 and trial['probabilityLeft'] == 0.8]
+        choices_L25_Lblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == -25 and trial['probabilityLeft'] == 0.8]
+        choices_L12_Lblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == -12.5 and trial['probabilityLeft'] == 0.8]
+        choices_L6_Lblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == -6.25 and trial['probabilityLeft'] == 0.8]
+        choices_0_Lblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == 0 and trial['probabilityLeft'] == 0.8]
+        choices_R6_Lblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == 6.25 and trial['probabilityLeft'] == 0.8]
+        choices_R12_Lblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == 12.5 and trial['probabilityLeft'] == 0.8]
+        choices_R25_Lblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == 25 and trial['probabilityLeft'] == 0.8]
+        choices_R100_Lblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == 100 and trial['probabilityLeft'] == 0.8]
+        choices_L100_Rblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == -100 and trial['probabilityLeft'] == 0.2]
+        choices_L25_Rblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == -25 and trial['probabilityLeft'] == 0.2]
+        choices_L12_Rblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == -12.5 and trial['probabilityLeft'] == 0.2]
+        choices_L6_Rblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == -6.25 and trial['probabilityLeft'] == 0.2]
+        choices_0_Rblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == 0 and trial['probabilityLeft'] == 0.2]
+        choices_R6_Rblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == 6.25 and trial['probabilityLeft'] == 0.2]
+        choices_R12_Rblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == 12.5 and trial['probabilityLeft'] == 0.2]
+        choices_R25_Rblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == 25 and trial['probabilityLeft'] == 0.2]
+        choices_R100_Rblock = [trial['choice'] for trial in session_data_nonstim[0] if trial['contrast'] == 100 and trial['probabilityLeft'] == 0.2]
+
+        biasshift_L100 = np.sum(np.array(choices_L100_Lblock) == 1)/len(choices_L100_Lblock) - np.sum(np.array(choices_L100_Rblock) == 1)/len(choices_L100_Rblock)
+        if np.isnan(biasshift_L100) == 1:
+            biasshift_L100 = 0
+        biasshift_L25 = np.sum(np.array(choices_L25_Lblock) == 1)/len(choices_L25_Lblock) - np.sum(np.array(choices_L25_Rblock) == 1)/len(choices_L25_Rblock)
+        if np.isnan(biasshift_L100) == 1:
+            biasshift_L100 = 0
+        biasshift_L12 = np.sum(np.array(choices_L12_Lblock) == 1)/len(choices_L12_Lblock) - np.sum(np.array(choices_L12_Rblock) == 1)/len(choices_L12_Rblock)
+        if np.isnan(biasshift_L100) == 1:
+            biasshift_L100 = 0
+        biasshift_L6 = np.sum(np.array(choices_L6_Lblock) == 1)/len(choices_L6_Lblock) - np.sum(np.array(choices_L6_Rblock) == 1)/len(choices_L6_Rblock)
+        if np.isnan(biasshift_L100) == 1:
+            biasshift_L100 = 0
+        biasshift_0 = np.sum(np.array(choices_0_Lblock) == 1)/len(choices_0_Lblock) - np.sum(np.array(choices_0_Rblock) == 1)/len(choices_0_Rblock)
+        if np.isnan(biasshift_L100) == 1:
+            biasshift_L100 = 0
+        biasshift_R6 = np.sum(np.array(choices_R6_Lblock) == 1)/len(choices_R6_Lblock) - np.sum(np.array(choices_R6_Rblock) == 1)/len(choices_R6_Rblock)
+        if np.isnan(biasshift_L100) == 1:
+            biasshift_L100 = 0
+        biasshift_R12 = np.sum(np.array(choices_R12_Lblock) == 1)/len(choices_R12_Lblock) - np.sum(np.array(choices_R12_Rblock) == 1)/len(choices_R12_Rblock)
+        if np.isnan(biasshift_L100) == 1:
+            biasshift_L100 = 0
+        biasshift_R25 = np.sum(np.array(choices_R25_Lblock) == 1)/len(choices_R25_Lblock) - np.sum(np.array(choices_R25_Rblock) == 1)/len(choices_R25_Rblock)
+        if np.isnan(biasshift_L100) == 1:
+            biasshift_L100 = 0
+        biasshift_R100 = np.sum(np.array(choices_R100_Lblock) == 1)/len(choices_R100_Lblock) - np.sum(np.array(choices_R100_Rblock) == 1)/len(choices_R100_Rblock)
+        if np.isnan(biasshift_L100) == 1:
+            biasshift_L100 = 0
+
+        total_biasshift = biasshift_L100 + biasshift_L25 + biasshift_L12 + biasshift_L6 + biasshift_0 + biasshift_R6 + biasshift_R12 + biasshift_R25 + biasshift_R100
+        print('Total bias shift = ' + str(total_biasshift))
+        if total_biasshift < min_bias_threshold_zapit:
+            print('Bias shift for session below threshold, skipping...')
+            continue
+
+
+        ####### creating a new dict to separate trials data by stim location        
+        ####### this formats the data in an easily accessible manner w/ conditions_data
+        ####### Loop over all trials and sort them into the condition_data dictionary
+        ####### Also, extract and save wheel data within this loop
+
+        whlpos, whlt = wheel.position, wheel.timestamps
+
+        for trial_number, condition_number in stimtrial_location_dict_all.items():
+            # print(str(trial_number) + ' ' + str(condition_number))
+
+            reaction_time = trials.feedback_times[trial_number] - trials.goCue_times[trial_number] 
+            if np.isnan(reaction_time) == 1:
+                if np.isnan(RT_threshold) == 0:
+                    continue
+            if reaction_time > RT_threshold:
+                if np.isnan(RT_threshold) == 0:
+                    continue
+
+            trials_data = {
+                # 'intervals': trials.intervals[trial_number],
+                'choice': trials.choice[trial_number],
+                'reaction_times': reaction_time,
+                'qp_times': trials.goCue_times[trial_number] - trials.intervals[trial_number][0],
+                'contrast': signed_contrast(trials)[trial_number],
+                # 'goCueTrigger_times': trials.goCueTrigger_times[trial_number],
+                # 'goCue_times': trials.goCue_times[trial_number],
+                # 'stimOn_times': trials.stimOn_times[trial_number],
+                # 'feedback_times': trials.feedback_times[trial_number],
+                # 'response_times': trials.response_times[trial_number],
+                'feedbackType': trials.feedbackType[trial_number],
+                'probabilityLeft': trials.probabilityLeft[trial_number],
+                # 'prev_choice': trials.choice[trial_number-1]
+            }
+            
+            # Append the trial data to the correct condition
+            condition_data[condition_number].append(trials_data)
+
+            # Now condition_data[1] contains all trials for location 1, condition_data[2] for location 2, and so on
+            # condition_data[0] contains all nonstim trials
+
+            #############################################################
+            ##### Load wheel data
+
+            if only_include_low_contrasts == 1:
+                if ~low_contrast_trials_bool_all[k]:
+                    continue
+            # start_time = taskData[trial_number]['behavior_data']['States timestamps']['trial_start'][0][0] - 0.03 #quiescent period - first 30ms step
+            # start_time = taskData[trial_number]['behavior_data']['States timestamps']['reward'][0][0] - 0.5 #reward/error
+            # if np.isnan(start_time) == 1:
+            #     start_time = taskData[trial_number]['behavior_data']['States timestamps']['error'][0][0] - 0.5
+
+            if align_to == 'goCue':
+                start_time = trials.goCue_times[trial_number] #GO CUE
+            elif align_to == 'goCue_pre':
+                start_time = trials.goCue_times[trial_number] - 0.5 #GO CUE - 0.5s
+            elif align_to == 'QP':
+                start_time = trials.intervals[trial_number][0] #QP / Laser onset
+            elif align_to == 'feedback':
+                start_time = trials.feedback_times[trial_number] - 0.6
+
+            wheel_start_index_pre = np.searchsorted(whlt, start_time)
+            t = start_time
+            # Check the closest value by comparing the differences between 't' and its neighboring elements
+            if wheel_start_index_pre == 0:
+                wheel_start_index = wheel_start_index_pre
+            elif wheel_start_index_pre == len(whlt):
+                wheel_start_index = wheel_start_index_pre - 1
+            else:
+                left_diff = t - whlt[wheel_start_index_pre - 1]
+                right_diff = whlt[wheel_start_index_pre] - t
+                wheel_start_index = wheel_start_index_pre - 1 if left_diff <= right_diff else wheel_start_index_pre
+
+
+            total_wheel_movement = []
+            for l in range(int(length_of_time_to_analyze_wheel_movement/interval)):
+                t = (start_time + l*interval)# + interval #ie, steps of 100ms
+                # wheel_end_index = np.argmin(np.abs(whlt - t))
+                #norm_wheel_vals = whlpos[wheel_start_index:wheel_end_index]/whlpos[wheel_start_index]
+
+                wheel_end_index_pre = np.searchsorted(whlt, t) #ie, steps of 100ms
+                # Check the closest value by comparing the differences between 't' and its neighboring elements
+                if wheel_end_index_pre == 0:
+                    wheel_end_index = wheel_end_index_pre
+                elif wheel_end_index_pre == len(whlt):
+                    wheel_end_index = wheel_end_index_pre - 1
+                else:
+                    left_diff = t - whlt[wheel_end_index_pre - 1]
+                    right_diff = whlt[wheel_end_index_pre] - t
+                    wheel_end_index = wheel_end_index_pre - 1 if left_diff <= right_diff else wheel_end_index_pre
+
+                ##only in case where aligning to QP, do not use any wheel movement past goCue
+                if align_to == 'QP' and trials.goCue_times[trial_number] < whlt[wheel_end_index]:
+                    total_wheel_movement = np.append(total_wheel_movement,np.nan)
+                ##only in case where aligning to goCue, do not use any wheel movement past feedback + 0.1
+                elif align_to == 'goCue' and (trials.feedback_times[trial_number] + interval) < whlt[wheel_end_index]:
+                    total_wheel_movement = np.append(total_wheel_movement,np.nan)
+                elif align_to == 'goCue_pre' and (trials.feedback_times[trial_number] + interval) < whlt[wheel_end_index]:
+                    total_wheel_movement = np.append(total_wheel_movement,np.nan)
+                else:
+                    total_wheel_movement = np.append(total_wheel_movement,whlpos[wheel_end_index] - whlpos[wheel_start_index])
+
+            ### append data here according to condition
+            if trials.probabilityLeft[trial_number] == 0.2:
+                if len(Rblock_wheel_movements_by_condition[condition_number]) == 0:
+                    Rblock_wheel_movements_by_condition[condition_number] = total_wheel_movement
+                else:
+                    Rblock_wheel_movements_by_condition[condition_number] = np.vstack([Rblock_wheel_movements_by_condition[condition_number],total_wheel_movement])
+            if trials.probabilityLeft[trial_number] == 0.8:
+                if len(Lblock_wheel_movements_by_condition[condition_number]) == 0:
+                    Lblock_wheel_movements_by_condition[condition_number] = total_wheel_movement
+                else:
+                    Lblock_wheel_movements_by_condition[condition_number] = np.vstack([Lblock_wheel_movements_by_condition[condition_number],total_wheel_movement])
+# except:
+    #     print('There was a problem with this session, skipping...')        
 
 
 
@@ -1608,11 +1900,12 @@ if is_zapit_session == 0:
 
     bias_vals_control_flipped = np.flip(bias_shift_sum_all_nonstim_LC)
     bias_vals_stim_flipped = np.flip(bias_shift_sum_all_LC)
+    # bias_vals_control_flipped = np.flip(bias_shift_sum_all_nonstim)
+    # bias_vals_stim_flipped = np.flip(bias_shift_sum_all)
     plt.figure()
     plt.plot(range(0,len(bias_vals_control_flipped)),bias_vals_control_flipped,'ko')
     plt.plot(range(0,len(bias_vals_stim_flipped)),bias_vals_stim_flipped,'bo')
     plt.title('Bias shift across sessions')
-    plt.show()
     if save_figures == 1:
         plt.savefig(figure_save_path + figure_prefix + '_bias_vals.png')  # Change the path as needed
         plt.close()
@@ -1782,6 +2075,367 @@ if is_zapit_session == 0:
         plt.close()
     else:
         plt.show()
+
+
+# =============================================================================
+# PER-MOUSE BIAS SHIFT ANALYSIS & PLOTTING
+# =============================================================================
+
+# # --- 1. ORGANIZE DATA ---
+# # Ensure input arrays are numpy arrays to handle indexing
+# arr_ids = np.array(MouseIDs_used_for_final_analysis)
+# arr_eids = np.array(EIDs_used_for_final_analysis)
+
+# # Create a master DataFrame from your existing session variables
+# df_sessions = pd.DataFrame({
+#     'MouseID': arr_ids,
+#     'SessionID': arr_eids,
+#     'Bias_Control_All': bias_shift_sum_all_nonstim,
+#     'Bias_Control_LC': bias_shift_sum_all_nonstim_LC,
+#     'Bias_Stim_All': bias_shift_sum_all,
+#     'Bias_Stim_LC': bias_shift_sum_all_LC,
+#     'num_trials_Control': nonstim_trials_added_per_session,
+#     'num_trials_Stim': stim_trials_added_per_session
+# })
+
+# # df_sessions[df_sessions['MouseID'] == 'SWC_NM_102']
+
+# # Filter out sessions that might have been skipped (NaNs)
+# df_clean = df_sessions.dropna()
+
+# print(f"Total Sessions Analyzed: {len(df_clean)}")
+
+# # --- 2. AGGREGATE PER MOUSE ---
+# # Group by MouseID and perform aggregation rules
+# aggregation_rules = {
+#     'Bias_Control_All': 'mean',
+#     'Bias_Control_LC': 'mean',
+#     'Bias_Stim_All': 'mean',
+#     'Bias_Stim_LC': 'mean',
+#     'num_trials_Stim': 'sum',  
+#     'num_trials_Control': 'sum' 
+# }
+
+# df_mouse = df_clean.groupby('MouseID').agg(aggregation_rules).reset_index()
+
+# print(f"Total Mice Analyzed: {len(df_mouse)}")
+# print(df_mouse)
+
+# import psychofit as psy
+
+# Bias_shift_value_ALL = []
+# Bias_shift_value_LOWCONTRAST = []
+# Accuracy_HC_nonstim = []
+# Accuracy_HC_stim = []
+
+
+# # --- ASSUMED INPUTS (Must exist in your workspace after running the pipeline) ---
+# # df_mouse: DataFrame with averaged bias shifts per mouse.
+# # nonstim_trials: Bunch object concatenated across ALL nonstim sessions.
+# # stim_trials: Bunch object concatenated across ALL stim sessions.
+# # all_nonstim_mouse_ids: (n_total_nonstim_trials,) array mapping trials to MouseID.
+# # all_stim_mouse_ids: (n_total_stim_trials,) array mapping trials to MouseID.
+# # kwargs: Dictionary containing psychofit parameters (defined in your attached script).
+# # signed_contrast: function from your psychometric_utils module.
+# # ---------------------------------------------------------------------------------
+
+# # --- ASSUMPTION: Trial Count Column Names ---
+# # We assume the aggregation step created these columns based on the previous interaction.
+# TOTAL_STIM_TRIALS_DF = df_mouse['num_trials_Stim'].sum()
+# TOTAL_NONSTIM_TRIALS_DF = df_mouse['num_trials_Control'].sum()
+
+# # Note: We must use the total length of the internal arrays in the Bunch objects.
+# # We will use the 'contrastLeft' attribute as a proxy for the total length.
+
+# # Sanity Check
+# if TOTAL_STIM_TRIALS_DF != len(stim_trials.contrastLeft):
+#     print(f"Dissonance: Total Stim Trials in DF ({TOTAL_STIM_TRIALS_DF}) does not match length of stim_trials object ({len(stim_trials.contrastLeft)}). Proceeding, but results may be misaligned.")
+# if TOTAL_NONSTIM_TRIALS_DF != len(nonstim_trials.contrastLeft):
+#     print(f"Dissonance: Total Nonstim Trials in DF ({TOTAL_NONSTIM_TRIALS_DF}) does not match length of nonstim_trials object ({len(nonstim_trials.contrastLeft)}). Proceeding, but results may be misaligned.")
+
+Bias_shift_value_ALL = []
+Bias_shift_value_LOWCONTRAST = []
+Accuracy_HC_nonstim = []
+Accuracy_HC_stim = []
+MouseID_list = []
+block_bias_nonstim_LC = []
+block_bias_stim_LC = []
+
+# Iterate directly through the dictionary keys (MouseIDs)
+for mouse_id in mouse_trials_container.keys():
+
+    print('Analyzing mouse ' + str(mouse_id))
+    
+    # 1. Retrieve the aggregated data for this mouse
+    restricted_trials_stim = mouse_trials_container[mouse_id]['stim']
+    restricted_trials_nonstim = mouse_trials_container[mouse_id]['nonstim']
+    
+    # Safety Check: Ensure enough trials exist
+    if len(restricted_trials_stim.contrastLeft) < 20 or len(restricted_trials_nonstim.contrastLeft) < 20:
+        print(f"Skipping {mouse_id}: Not enough trials.")
+        continue
+
+    # 2. Calculate Contrasts (Using your existing helper)
+    stim_trials_contrast = signed_contrast(restricted_trials_stim)
+    nonstim_trials_contrast = signed_contrast(restricted_trials_nonstim)
+
+    # ... [Insert your mask definition logic here (HC_values, LC_values, np.isin)] ...
+    
+    # Mask for High Contrast (HC): 100, 25, -25, -100
+    HC_values = np.array([100., -100., 25., -25.])
+    stim_trialmask_HC = np.isin(stim_trials_contrast, HC_values)
+    nonstim_trialmask_HC = np.isin(nonstim_trials_contrast, HC_values)
+    
+    # Mask for Low Contrast (LC): 0, +/- 12.5, +/- 6.25
+    LC_values = np.array([0., -12.5, 12.5, -6.25, 6.25])
+    stim_trialmask_LC = np.isin(stim_trials_contrast, LC_values)
+    nonstim_trialmask_LC = np.isin(nonstim_trials_contrast, LC_values)
+
+    
+    # 5. ORGANIZE DATA, FIT, AND EXTRACT SHIFTS (assuming 'kwargs' is available)
+    
+    # You must move the definition of 'organize_psychodata' outside this loop, 
+    # but the subsequent calls are placed here:
+    stim_trials_data = organize_psychodata(restricted_trials_stim, stim_trials_contrast)
+    nonstim_trials_data = organize_psychodata(restricted_trials_nonstim, nonstim_trials_contrast)
+
+    # Calculate shifts for control and stim
+    bs_all_ctrl, bs_lc_ctrl = fit_and_extract_bias_shift(nonstim_trials_data)
+    bs_all_stim, bs_lc_stim = fit_and_extract_bias_shift(stim_trials_data)
+    
+    # 6. APPEND RESULTS (Stim effect on Control)
+    Bias_shift_value_ALL.append(bs_all_stim - bs_all_ctrl) 
+    Bias_shift_value_LOWCONTRAST.append(bs_lc_stim - bs_lc_ctrl) 
+    block_bias_nonstim_LC.append(bs_lc_ctrl)
+    block_bias_stim_LC.append(bs_lc_stim)
+    MouseID_list.append(mouse_id)
+    
+    # 7. CALCULATE ACCURACY (HC only)
+    acc_nonstim = calculate_accuracy_hc(restricted_trials_nonstim, nonstim_trialmask_HC)
+    acc_stim = calculate_accuracy_hc(restricted_trials_stim, stim_trialmask_HC)
+    
+    Accuracy_HC_nonstim.append(acc_nonstim)
+    Accuracy_HC_stim.append(acc_stim)
+
+
+    # # 8. UPDATE CUMULATIVE INDICES for the next loop iteration
+    # stim_start_index += N_stim
+    # nonstim_start_index += N_nonstim
+    
+print("--- Per-Mouse Data Processing Complete ---")
+
+# ---  FINAL DATA STRUCTURE ---
+df_mouse_bias = pd.DataFrame({
+    'MouseID': MouseID_list,
+    'Bias_Values_Nonstim_LC': block_bias_nonstim_LC,
+    'Bias_Values_Stim_LC': block_bias_stim_LC,
+    'Accuracy_HC_Control': Accuracy_HC_nonstim,
+    'Accuracy_HC_Stim': Accuracy_HC_stim
+})
+
+#### PLOT
+def plot_bias_shift_by_mouse(mouse_df, mode='LC', save_path=None, prefix=''):
+    """
+    Plots paired bias shift (Control vs Stim) per mouse.
+    mode: 'LC' (Low Contrast) or 'All' (All Contrasts)
+    """
+    # Select columns based on mode
+    if mode == 'LC':
+        col_ctrl = 'Bias_Values_Nonstim_LC'
+        col_stim = 'Bias_Values_Stim_LC'
+        title = 'Bias Shift (Low Contrast)'
+    else:
+        col_ctrl = 'Bias_Values_Nonstim'
+        col_stim = 'Bias_Values_Stim'
+        title = 'Bias Shift (All Contrasts)'
+
+    # Drop mice with NaNs in these specific columns
+    df_plot = mouse_df[[col_ctrl, col_stim]].dropna()
+    
+    # Data for plotting
+    ctrl_vals = df_plot[col_ctrl].values
+    stim_vals = df_plot[col_stim].values
+    n_mice = len(df_plot)
+
+    # Statistics (Paired t-test)
+    t_stat, p_val = stats.ttest_rel(ctrl_vals, stim_vals)
+    
+    # Prepare figure
+    plt.figure(figsize=(4, 5))
+    
+    # 1. Plot the "Spaghetti" lines (Individual Mice)
+    # We plot these first so they are behind the bars/dots
+    for i in range(n_mice):
+        plt.plot([0, 1], [ctrl_vals[i], stim_vals[i]], 
+                 color='gray', alpha=0.5, linewidth=1, marker='o', markersize=5)
+
+    # 2. Plot the Group Means (Bars)
+    mean_ctrl = np.mean(ctrl_vals)
+    mean_stim = np.mean(stim_vals)
+    sem_ctrl = stats.sem(ctrl_vals)
+    sem_stim = stats.sem(stim_vals)
+    
+    plt.bar(0, mean_ctrl, color='black', alpha=0.3, width=0.6, label='Control')
+    plt.bar(1, mean_stim, color='blue', alpha=0.3, width=0.6, label='Stim')
+    
+    # 3. Add Error Bars to the Means
+    plt.errorbar(0, mean_ctrl, yerr=sem_ctrl, color='black', linewidth=3, capsize=5)
+    plt.errorbar(1, mean_stim, yerr=sem_stim, color='blue', linewidth=3, capsize=5)
+
+    # Aesthetics
+    plt.xticks([0, 1], ['Control', 'SNr Inhibition'])
+    plt.ylabel('Bias Shift Metric')
+    plt.title(f"{title}\n(n={n_mice} mice)")
+    plt.xlim(-0.6, 1.6)
+    
+    # Add P-value annotation
+    y_max = max(np.max(ctrl_vals), np.max(stim_vals))
+    plt.text(0.5, y_max * 1.05, f'p = {p_val:.4f}', ha='center', fontsize=12)
+    
+    # Despine
+    sns.despine()
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(f"{save_path}/{prefix}_BiasShift_PerMouse_{mode}.png")
+        print(f"Saved figure to {save_path}/{prefix}_BiasShift_PerMouse_{mode}.png")
+    
+    plt.show()
+    
+    return p_val
+
+# --- PLOT ---
+# Toggle this variable to switch modes
+# analysis_mode = 'All' 
+analysis_mode = 'LC' 
+
+p_value = plot_bias_shift_by_mouse(
+    df_mouse_bias, 
+    mode=analysis_mode, 
+    save_path=figure_save_path if save_figures else None, 
+    prefix=figure_prefix
+)
+
+
+# # --- 2. PLOTTING ---
+# plt.figure(figsize=(7, 6))
+
+# # A. The Bar Plot (Averages)
+# # We save the axes object 'ax' to draw lines on it later
+# ax = sns.barplot(
+#     data=df, x='Hemisphere', y='Separation', hue='Condition',
+#     palette={'Control': 'gray', 'Opto': 'dodgerblue'},
+#     errorbar='se', capsize=0.1, alpha=0.9, err_kws={'linewidth': 2}
+# )
+
+# # B. The Paired Lines (Red Spaghetti)
+# # This requires knowing the X-coordinates of the bars. 
+# # In a 2-hue barplot, the centers are usually at: [Tick - width/2, Tick + width/2]
+# # Default width is 0.8, so offset is +/- 0.2.
+# bar_width = 0.4 # Approx offset
+# x_centers = {'Ipsi': 0, 'Contra': 1}
+# offsets   = {'Control': -0.2, 'Opto': 0.2}
+
+# # Loop through each PID to draw lines
+# pids = df['PID'].unique()
+# for pid in pids:
+#     subset = df[df['PID'] == pid]
+#     if len(subset) != 2: continue # Skip if missing one condition
+    
+#     hemi = subset['Hemisphere'].iloc[0]
+    
+#     # Get Y values
+#     y_ctrl = subset[subset['Condition'] == 'Control']['Separation'].values[0]
+#     y_opto = subset[subset['Condition'] == 'Opto']['Separation'].values[0]
+    
+#     # Calculate X coordinates
+#     x_ctrl = x_centers[hemi] + offsets['Control']
+#     x_opto = x_centers[hemi] + offsets['Opto']
+    
+#     # Plot the Line
+#     plt.plot([x_ctrl, x_opto], [y_ctrl, y_opto], color='red', linewidth=1, alpha=0.5, zorder=10)
+#     # Plot the dots on top of the lines
+#     plt.scatter([x_ctrl, x_opto], [y_ctrl, y_opto], color='navy', s=20, zorder=11, edgecolors='white', linewidth=0.5)
+
+# # Decoration
+# plt.axhline(0, color='k', linewidth=0.5)
+# plt.ylabel(f"Mean CD Separation ({WINDOW_START}-{WINDOW_END}s)")
+# plt.title(f"Effect of SNr Inhibition (Integrated {WINDOW_START}-{WINDOW_END}s)")
+# plt.legend(loc='upper right')
+# plt.tight_layout()
+
+# plt.savefig(figures_path + '/Quantification_PairedLines.png')
+# plt.show()
+
+# # --- 8. FINAL DATA STRUCTURE ---
+# df_mouse_bias = pd.DataFrame({
+#     'MouseID': MouseID_list,
+#     'Bias_Shift_ALL': Bias_shift_value_ALL,
+#     'Bias_Shift_LC': Bias_shift_value_LOWCONTRAST,
+#     'Accuracy_HC_Control': Accuracy_HC_nonstim,
+#     'Accuracy_HC_Stim': Accuracy_HC_stim
+# })
+
+# print("--- NEW PER-MOUSE BIAS SHIFT DATA ---")
+# print(df_mouse_bias)
+# # ### recalculate bias, high and low contrast accuracy
+# # for mouse_number in range(0,len(df_mouse)):
+
+#     ### create new trials object corresponding to each mouse's data
+#     ### nonstim_trials and ### stim_trials are iblutil.util.Bunch objects (AlfBunch?)
+#     nonstim_trials_numbers_to_use = df_mouse[mouse_number].num_trials_Control
+#     stim_trials_numbers_to_use = df_mouse[mouse_number].num_trials_Stim
+#     restricted_trials_nonstim = nonstim_trials.all[nonstim_trials_numbers_to_use] #AttributeError: 'Bunch' object has no attribute 'all'
+#     restricted_trials_stim = stim_trials.all[stim_trials_numbers_to_use] #AttributeError: 'Bunch' object has no attribute 'all'
+
+#     stim_trials_contrast = signed_contrast(restricted_trials_stim) #this is a function I use
+#     nonstim_trials_contrast = signed_contrast(restricted_trials_nonstim)
+
+#     nonstim_trialnums_HC = np.where(nonstim_trials_contrast == 100 or nonstim_trials_contrast == -100 or nonstim_trials_contrast == -25 or nonstim_trials_contrast == 25)[0]
+#     stim_trialnums_HC = np.where(stim_trials_contrast == 100 or stim_trials_contrast == -100 or stim_trials_contrast == -25 or stim_trials_contrast == 25)[0]
+#     nonstim_trialnums_LC = np.where(nonstim_trials_contrast == 0 or nonstim_trials_contrast == -12.5 or nonstim_trials_contrast == -6.25 or nonstim_trials_contrast == 12.5 or nonstim_trials_contrast == 6.25)[0]
+#     stim_trialnums_HC = np.where(stim_trials_contrast == 0 or stim_trials_contrast == -12.5 or stim_trials_contrast == -6.25 or stim_trials_contrast == 12.5 or stim_trials_contrast == 6.25)[0]
+
+#     ### organize data for psychometric curve fitting
+#     stim_trials_data = {}
+#     for pL in np.unique(restricted_trials_stim.probabilityLeft):
+#         in_block = restricted_trials_stim.probabilityLeft == pL
+#         xx, nn = np.unique(stim_trials_contrast[in_block], return_counts=True)
+#         rightward = restricted_trials_stim.choice == -1
+#         pp = np.vectorize(lambda x: np.mean(rightward[(x == stim_trials_contrast) & in_block]))(xx)
+#         stim_trials_data[pL] = np.vstack((xx, nn, pp))
+
+#     nonstim_trials_data = {}
+#     for pL in np.unique(restricted_trials_nonstim.probabilityLeft):
+#         in_block = restricted_trials_nonstim.probabilityLeft == pL
+#         xx, nn = np.unique(nonstim_trials_contrast[in_block], return_counts=True)
+#         rightward = restricted_trials_nonstim.choice == -1
+#         pp = np.vectorize(lambda x: np.mean(rightward[(x == nonstim_trials_contrast) & in_block]))(xx)
+#         nonstim_trials_data[pL] = np.vstack((xx, nn, pp))
+
+#     ### this extracts psychometric values 
+#     for pL, da in nonstim_trials_data.items():
+#         pars, L = psy.mle_fit_psycho(da, 'erf_psycho_2gammas', **kwargs);
+
+#         if pL == 0.8:
+#             bias_block_80_vals = da[2,:]
+
+#         if pL == 0.2:
+#             bias_block_20_vals = da[2,:]
+
+#     Bias_shift_value_ALL.append((bias_block_20_vals[0] - bias_block_80_vals[0]) + (bias_block_20_vals[1] - bias_block_80_vals[1]) + ### goes to 8)
+#     Bias_shift_value_LOWCONTRAST.append((bias_block_20_vals[2] - bias_block_80_vals[2]) + (bias_block_20_vals[3] - bias_block_80_vals[3]) + ### goes to 6)
+
+#     ### Accuracy high/low contrasts
+#     Accuracy_HC_nonstim.append(np.sum(np.where(restricted_trials_nonstim.feedbackType[nonstim_trialnums_HC])) / len(nonstim_trialnums_HC)) ### feedbackType is a 1 or -1 depending on correct or incorrect
+#     Accuracy_HC_stim.append(np.sum(np.where(restricted_trials_stim.feedbackType[stim_trialnums_HC] == 1)) / len(stim_trialnums_HC))
+
+
+
+
+# Optional: Save the summary dataframe
+if save_figures:
+    df_mouse.to_csv(f"{figure_save_path}/{figure_prefix}_BiasShift_PerMouse_Summary.csv")
 
 ###############################################################################################
 ####################### ZAPIT ANALYSIS HERE
@@ -2212,7 +2866,11 @@ else:
     cbar = plt.colorbar(sm, ax=ax, orientation='vertical', fraction=0.046, pad=0.04, aspect=12)
     cbar.set_label('Reaction time (s)', fontsize=14, labelpad=15)
     cbar.ax.tick_params(labelsize=12)
-    plt.show()
+    if save_figures == 1:
+        plt.savefig(figure_save_path + figure_prefix + '_RT_zapit.png')  # Change the path as needed
+        plt.close()
+    else:
+        plt.show()
 
     ############ QP
     # Plot the brain atlas with the correct extent
@@ -2268,7 +2926,11 @@ else:
     cbar = plt.colorbar(sm, ax=ax, orientation='vertical', fraction=0.046, pad=0.04, aspect=12)
     cbar.set_label('Quiescent Period Time (s)', fontsize=14, labelpad=15)
     cbar.ax.tick_params(labelsize=12)
-    plt.show()
+    if save_figures == 1:
+        plt.savefig(figure_save_path + figure_prefix + '_QP_zapit.png')  # Change the path as needed
+        plt.close()
+    else:
+        plt.show()
 
     ############ LAPSE RATE
     # Plot the brain atlas with the correct extent
@@ -2320,7 +2982,11 @@ else:
     cbar = plt.colorbar(sm, ax=ax, orientation='vertical', fraction=0.046, pad=0.04, aspect=12)
     cbar.set_label('Lapse Rate', fontsize=14, labelpad=15)
     cbar.ax.tick_params(labelsize=12)
-    plt.show()
+    if save_figures == 1:
+        plt.savefig(figure_save_path + figure_prefix + '_lapse_zapit.png')  # Change the path as needed
+        plt.close()
+    else:
+        plt.show()
 
     ############ BIAS1
     # Assuming stim_locations is a dictionary with coordinates for each stimulation point
@@ -2399,7 +3065,11 @@ else:
     cbar = plt.colorbar(sm, ax=ax, orientation='vertical', fraction=0.046, pad=0.04, aspect=12)
     cbar.set_label('Block Bias Reduction', fontsize=14, labelpad=15)
     cbar.ax.tick_params(labelsize=12)
-    plt.show()
+    if save_figures == 1:
+        plt.savefig(figure_save_path + figure_prefix + '_Bias1_zapit.png')  # Change the path as needed
+        plt.close()
+    else:
+        plt.show()
 
     ############ BIAS2
 
@@ -2468,7 +3138,11 @@ else:
     cbar = plt.colorbar(sm, ax=ax, orientation='vertical', fraction=0.046, pad=0.04, aspect=12)
     cbar.set_label('Block Bias Reduction (alt)', fontsize=14, labelpad=15)
     cbar.ax.tick_params(labelsize=12)
-    plt.show()
+    if save_figures == 1:
+        plt.savefig(figure_save_path + figure_prefix + '_Bias2_zapit.png')  # Change the path as needed
+        plt.close()
+    else:
+        plt.show()
 
     ### also need to create a measure of high contrast accuracy and visualize that at each location
     ### also, use this on nonstim trials to exclude sessions below performance threshold
@@ -2498,13 +3172,13 @@ else:
 
     #################################### PLOT PSYCHOMETRIC #####################################
 
-    condition = 32
-    # Extract or calculate the psychometric data for the current condition
-    left_block_choices = left_block_pleft_vals[condition]
-    right_block_choices = right_block_pleft_vals[condition]
+    # condition = 32
+    # # Extract or calculate the psychometric data for the current condition
+    # left_block_choices = left_block_pleft_vals[condition]
+    # right_block_choices = right_block_pleft_vals[condition]
 
-    # Plot the psychometric curves
-    plot_psychometric(contrasts, left_block_choices, right_block_choices, f'Condition {condition}')
+    # # Plot the psychometric curves
+    # plot_psychometric(contrasts, left_block_choices, right_block_choices, f'Condition {condition}')
 
     # Wait for user input to proceed to the next plot
     # input("Press Enter to continue to the next plot...")
@@ -2513,40 +3187,40 @@ else:
     #################################### PLOT WHEEL ##########################################
     ### condition defined above
 
-    x_vals_for_plot = np.arange(0, length_of_time_to_analyze_wheel_movement, interval)
+    # x_vals_for_plot = np.arange(0, length_of_time_to_analyze_wheel_movement, interval)
 
-    mean_L_block_wheel_movements_stim = np.nanmean(Lblock_wheel_movements_by_condition[condition], axis=0)
-    mean_R_block_wheel_movements_stim = np.nanmean(Rblock_wheel_movements_by_condition[condition], axis=0)
-    mean_L_block_wheel_movements_nonstim = np.nanmean(Lblock_wheel_movements_by_condition[0], axis=0)
-    mean_R_block_wheel_movements_nonstim = np.nanmean(Rblock_wheel_movements_by_condition[0], axis=0)
+    # mean_L_block_wheel_movements_stim = np.nanmean(Lblock_wheel_movements_by_condition[condition], axis=0)
+    # mean_R_block_wheel_movements_stim = np.nanmean(Rblock_wheel_movements_by_condition[condition], axis=0)
+    # mean_L_block_wheel_movements_nonstim = np.nanmean(Lblock_wheel_movements_by_condition[0], axis=0)
+    # mean_R_block_wheel_movements_nonstim = np.nanmean(Rblock_wheel_movements_by_condition[0], axis=0)
 
-    plt.plot(x_vals_for_plot, mean_L_block_wheel_movements_stim, color='xkcd:violet', linestyle='dashed')
-    plt.plot(x_vals_for_plot, mean_R_block_wheel_movements_stim, color='xkcd:tangerine', linestyle='dashed')
-    plt.plot(x_vals_for_plot, mean_L_block_wheel_movements_nonstim, color='xkcd:violet', linestyle='solid')
-    plt.plot(x_vals_for_plot, mean_R_block_wheel_movements_nonstim, color='xkcd:tangerine', linestyle='solid')
+    # plt.plot(x_vals_for_plot, mean_L_block_wheel_movements_stim, color='xkcd:violet', linestyle='dashed')
+    # plt.plot(x_vals_for_plot, mean_R_block_wheel_movements_stim, color='xkcd:tangerine', linestyle='dashed')
+    # plt.plot(x_vals_for_plot, mean_L_block_wheel_movements_nonstim, color='xkcd:violet', linestyle='solid')
+    # plt.plot(x_vals_for_plot, mean_R_block_wheel_movements_nonstim, color='xkcd:tangerine', linestyle='solid')
 
-    for k in range(len(x_vals_for_plot)):
-        valid_data = Lblock_wheel_movements_by_condition[condition][:,k][~np.isnan(Lblock_wheel_movements_by_condition[condition][:,k])]
-        sem = np.nanstd(valid_data, ddof=1) / np.sqrt(len(valid_data)) # calculating SEM manually
-        plt.errorbar(x_vals_for_plot[k], mean_L_block_wheel_movements_stim[k], yerr=sem, color='r')
-        valid_data = Rblock_wheel_movements_by_condition[condition][:,k][~np.isnan(Rblock_wheel_movements_by_condition[condition][:,k])]
-        sem = np.nanstd(valid_data, ddof=1) / np.sqrt(len(valid_data)) # calculating SEM manually
-        plt.errorbar(x_vals_for_plot[k], mean_R_block_wheel_movements_stim[k], yerr=sem, color='r')
-        valid_data = Lblock_wheel_movements_by_condition[0][:,k][~np.isnan(Lblock_wheel_movements_by_condition[0][:,k])]
-        sem = np.nanstd(valid_data, ddof=1) / np.sqrt(len(valid_data)) # calculating SEM manually
-        plt.errorbar(x_vals_for_plot[k], mean_L_block_wheel_movements_nonstim[k], yerr=sem, color='k')
-        valid_data = Rblock_wheel_movements_by_condition[0][:,k][~np.isnan(Rblock_wheel_movements_by_condition[0][:,k])]
-        sem = np.nanstd(valid_data, ddof=1) / np.sqrt(len(valid_data)) # calculating SEM manually
-        plt.errorbar(x_vals_for_plot[k], mean_R_block_wheel_movements_nonstim[k], yerr=sem, color='k')
+    # for k in range(len(x_vals_for_plot)):
+    #     valid_data = Lblock_wheel_movements_by_condition[condition][:,k][~np.isnan(Lblock_wheel_movements_by_condition[condition][:,k])]
+    #     sem = np.nanstd(valid_data, ddof=1) / np.sqrt(len(valid_data)) # calculating SEM manually
+    #     plt.errorbar(x_vals_for_plot[k], mean_L_block_wheel_movements_stim[k], yerr=sem, color='r')
+    #     valid_data = Rblock_wheel_movements_by_condition[condition][:,k][~np.isnan(Rblock_wheel_movements_by_condition[condition][:,k])]
+    #     sem = np.nanstd(valid_data, ddof=1) / np.sqrt(len(valid_data)) # calculating SEM manually
+    #     plt.errorbar(x_vals_for_plot[k], mean_R_block_wheel_movements_stim[k], yerr=sem, color='r')
+    #     valid_data = Lblock_wheel_movements_by_condition[0][:,k][~np.isnan(Lblock_wheel_movements_by_condition[0][:,k])]
+    #     sem = np.nanstd(valid_data, ddof=1) / np.sqrt(len(valid_data)) # calculating SEM manually
+    #     plt.errorbar(x_vals_for_plot[k], mean_L_block_wheel_movements_nonstim[k], yerr=sem, color='k')
+    #     valid_data = Rblock_wheel_movements_by_condition[0][:,k][~np.isnan(Rblock_wheel_movements_by_condition[0][:,k])]
+    #     sem = np.nanstd(valid_data, ddof=1) / np.sqrt(len(valid_data)) # calculating SEM manually
+    #     plt.errorbar(x_vals_for_plot[k], mean_R_block_wheel_movements_nonstim[k], yerr=sem, color='k')
 
-    plt.ylabel('Total leftward wheel movement')
-    plt.xlabel('Time from ' + align_to + ' onset')
-    plt.legend(['Stim Lblock', 'Stim Rblock', 'CTR Lblock','CTR Rblock'])
-    plt.title('Wheel movement stim vs. no stim')
-    # plt.axvline(x=0.6, color='red', linestyle='dotted')
-    # plt.xlim(0,5)
-    # plt.ylim(-0.15,0.15)
-    plt.show()
+    # plt.ylabel('Total leftward wheel movement')
+    # plt.xlabel('Time from ' + align_to + ' onset')
+    # plt.legend(['Stim Lblock', 'Stim Rblock', 'CTR Lblock','CTR Rblock'])
+    # plt.title('Wheel movement stim vs. no stim')
+    # # plt.axvline(x=0.6, color='red', linestyle='dotted')
+    # # plt.xlim(0,5)
+    # # plt.ylim(-0.15,0.15)
+    # plt.show()
 
 
     ###### Alternative plot using p values of difference between r and left blocks
@@ -2620,7 +3294,11 @@ else:
     ax.set_xlabel('Mediolateral Position')
     ax.set_ylabel('Anteroposterior Position')
 
-    plt.show()
+    if save_figures == 1:
+        plt.savefig(figure_save_path + figure_prefix + '_heatmap_logp_zapit.png')  # Change the path as needed
+        plt.close()
+    else:
+        plt.show()
 
     ### analyze wheel!
 
